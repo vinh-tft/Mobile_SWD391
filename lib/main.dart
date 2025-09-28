@@ -18,7 +18,7 @@ class GreenLoopApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         useMaterial3: true,
-        fontFamily: 'Inter',
+        // fontFamily: 'Inter', // Commented out to avoid font loading issues
       ),
       home: const GreenLoopHomePage(),
     );
@@ -45,31 +45,36 @@ class GreenLoopHomePage extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       // Logo
-                      Row(
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF22C55E),
-                              borderRadius: BorderRadius.circular(6),
+                      Flexible(
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF22C55E),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(
+                                Icons.recycling,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.recycling,
-                              color: Colors.white,
-                              size: 20,
+                            const SizedBox(width: 8),
+                            const Flexible(
+                              child: Text(
+                                'Green Loop',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1F2937),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Green Loop',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1F2937),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       // Theme toggle
                       const Icon(
@@ -81,18 +86,28 @@ class GreenLoopHomePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   // Navigation menu - responsive
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildNavItem('Features'),
-                        _buildNavItem('About'),
-                        _buildNavItem('Contact'),
-                        _buildNavItem('Marketplace'),
-                        _buildNavItem('How it Works'),
-                      ],
-                    ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Check if we have enough space for all nav items
+                      final navItems = ['Features', 'About', 'Contact', 'Marketplace', 'How it Works'];
+                      final totalWidth = navItems.length * 120.0; // Approximate width per item
+                      
+                      if (constraints.maxWidth >= totalWidth) {
+                        // Enough space - show all items in a row
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: navItems.map((item) => _buildNavItem(item)).toList(),
+                        );
+                      } else {
+                        // Not enough space - use horizontal scroll
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: navItems.map((item) => _buildNavItem(item)).toList(),
+                          ),
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
@@ -125,7 +140,7 @@ class GreenLoopHomePage extends StatelessWidget {
                   RichText(
                     text: const TextSpan(
                       style: TextStyle(
-                        fontSize: 32,
+                        fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1F2937),
                         height: 1.1,
@@ -144,7 +159,7 @@ class GreenLoopHomePage extends StatelessWidget {
                   const Text(
                     'Join the sustainable fashion revolution. Buy, sell, and rent pre-loved clothing while reducing waste and building a circular economy.',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       color: Color(0xFF6B7280),
                       height: 1.6,
                     ),
@@ -275,15 +290,15 @@ class GreenLoopHomePage extends StatelessWidget {
 
   Widget _buildNavItem(String text) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
       child: InkWell(
         onTap: () {
           // Handle navigation
-          print('Navigating to: $text');
+          debugPrint('Navigating to: $text');
         },
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             color: Colors.transparent,
@@ -291,7 +306,7 @@ class GreenLoopHomePage extends StatelessWidget {
           child: Text(
             text,
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 14,
               color: Color(0xFF1F2937),
               fontWeight: FontWeight.w500,
             ),

@@ -118,7 +118,7 @@ class FooterWidget extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        ...links.map((link) => _buildFooterLink(link)).toList(),
+        ...links.map((link) => _buildFooterLink(link)),
       ],
     );
   }
@@ -129,7 +129,7 @@ class FooterWidget extends StatelessWidget {
       child: GestureDetector(
         onTap: () {
           // Handle navigation here
-          print('Navigating to: $text');
+          debugPrint('Navigating to: $text');
         },
         child: Text(
           text,

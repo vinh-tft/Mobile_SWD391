@@ -6,9 +6,9 @@ plugins {
 }
 
 android {
-    namespace = "com.greenloop.app"
+    namespace = "com.example.greenloop"
     compileSdk = 35
-    ndkVersion = "26.1.10909125"
+    // ndkVersion = "26.1.10909125" // Commented out to use default NDK
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.greenloop.app"
+        applicationId = "com.example.greenloop"
         minSdk = 24
         targetSdk = 35
         versionCode = 1

@@ -26,7 +26,6 @@
         android:name="${applicationName}"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -39,7 +38,6 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
@@ -79,10 +77,10 @@
 
         <!-- App metadata -->
         <meta-data
-            android:name="com.greenloop.app.version"
+            android:name="com.example.greenloop.version"
             android:value="1.0.0" />
         <meta-data
-            android:name="com.greenloop.app.build"
+            android:name="com.example.greenloop.build"
             android:value="1" />
     </application>
 
