@@ -1,0 +1,44 @@
+name: green_loop_web
+description: Green Loop sustainable fashion platform - Flutter web app
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  
+  # UI & Animation Libraries
+  flutter_animate: ^4.5.0
+  google_fonts: ^6.1.0
+  flutter_staggered_animations: ^1.1.1
+  
+  # State Management
+  provider: ^6.1.1
+  
+  # HTTP & API
+  http: ^1.1.0
+  dio: ^5.4.0
+  
+  # Responsive Design
+  responsive_framework: ^1.1.1
+  
+  # Icons & Assets
+  font_awesome_flutter: ^10.6.0
+  
+  # Utilities
+  url_launcher: ^6.2.2
+  shared_preferences: ^2.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
