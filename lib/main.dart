@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'widgets/footer_widget.dart';
 
 void main() {
   runApp(const GreenLoopApp());
@@ -18,104 +17,109 @@ class GreenLoopApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         useMaterial3: true,
-        // fontFamily: 'Inter', // Commented out to avoid font loading issues
+        scaffoldBackgroundColor: Colors.white,
       ),
       home: const GreenLoopHomePage(),
     );
   }
 }
 
-class GreenLoopHomePage extends StatelessWidget {
+class GreenLoopHomePage extends StatefulWidget {
   const GreenLoopHomePage({super.key});
+
+  @override
+  State<GreenLoopHomePage> createState() => _GreenLoopHomePageState();
+}
+
+class _GreenLoopHomePageState extends State<GreenLoopHomePage> {
+  int _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Header Section
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: Column(
-                children: [
-                  // Top row with logo and theme toggle
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Logo
-                      Flexible(
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF22C55E),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Icon(
-                                Icons.recycling,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Flexible(
-                              child: Text(
-                                'Green Loop',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1F2937),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Theme toggle
-                      const Icon(
-                        Icons.wb_sunny_outlined,
-                        color: Color(0xFF6B7280),
-                        size: 24,
-                      ),
-                    ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // Header Section
+              _buildHeader(),
+              
+              // Hero Section
+              _buildHeroSection(),
+              
+              // Statistics Section
+              _buildStatistics(),
+              
+              // Feature Cards Section
+              _buildFeatureCards(),
+              
+              // Why Choose Section
+              _buildWhyChooseSection(),
+              
+              // Bottom Feature Cards
+              _buildBottomFeatureCards(),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNavigation(),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Logo
+          Flexible(
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF22C55E),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  const SizedBox(height: 16),
-                  // Navigation menu - responsive
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      // Check if we have enough space for all nav items
-                      final navItems = ['Features', 'About', 'Contact', 'Marketplace', 'How it Works'];
-                      final totalWidth = navItems.length * 120.0; // Approximate width per item
-                      
-                      if (constraints.maxWidth >= totalWidth) {
-                        // Enough space - show all items in a row
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: navItems.map((item) => _buildNavItem(item)).toList(),
-                        );
-                      } else {
-                        // Not enough space - use horizontal scroll
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: navItems.map((item) => _buildNavItem(item)).toList(),
-                          ),
-                        );
-                      }
-                    },
+                  child: const Icon(
+                    Icons.recycling,
+                    color: Colors.white,
+                    size: 20,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                const Flexible(
+                  child: Text(
+                    'Green Loop',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2937),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
-            
-            // Main Content Section
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
+          ),
+          // Theme toggle
+          const Icon(
+            Icons.wb_sunny_outlined,
+            color: Color(0xFF6B7280),
+            size: 24,
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildHeroSection() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -166,8 +170,7 @@ class GreenLoopHomePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 32),
                   // Buttons
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+          Row(
                     children: [
                       ElevatedButton(
                         onPressed: () {},
@@ -180,7 +183,7 @@ class GreenLoopHomePage extends StatelessWidget {
                           ),
                         ),
                         child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                           children: [
                             Text('Start Your Journey'),
                             SizedBox(width: 8),
@@ -188,7 +191,7 @@ class GreenLoopHomePage extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
+              const SizedBox(width: 12),
                       OutlinedButton(
                         onPressed: () {},
                         style: OutlinedButton.styleFrom(
@@ -203,122 +206,27 @@ class GreenLoopHomePage extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 40),
-                  // Stats
-                  Wrap(
-                    spacing: 20,
-                    runSpacing: 20,
-                    children: [
-                      _buildStat('10K+', 'Items Listed'),
-                      _buildStat('5K+', 'Happy Users'),
-                      _buildStat('95%', 'Satisfaction'),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-                  // Feature cards
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Column(
-                      children: [
-                        Icon(
-                          Icons.shopping_bag_outlined,
-                          color: Color(0xFF22C55E),
-                          size: 48,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'Marketplace',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1F2937),
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Buy & sell sustainable fashion',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF6B7280),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Why Choose Green Loop Section
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Why Choose Green Loop?',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    "We're revolutionizing fashion with innovative features that make sustainable shopping easy and rewarding.",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Footer
-            const FooterWidget(),
-          ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildNavItem(String text) {
+  Widget _buildStatistics() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      child: InkWell(
-        onTap: () {
-          // Handle navigation
-          debugPrint('Navigating to: $text');
-        },
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: Colors.transparent,
-          ),
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF1F2937),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildStat('10K+', 'Items Listed'),
+          _buildStat('5K+', 'Happy Users'),
+          _buildStat('95%', 'Satisfaction'),
+        ],
       ),
     );
   }
 
   Widget _buildStat(String value, String label) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           value,
@@ -336,6 +244,240 @@ class GreenLoopHomePage extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFeatureCards() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      child: Column(
+        children: [
+          _buildFeatureCard(
+            Icons.shopping_bag_outlined,
+            'Marketplace',
+            'Buy & sell sustainable fashion',
+          ),
+          const SizedBox(height: 16),
+          _buildFeatureCard(
+            Icons.favorite_outline,
+            'Loved Items',
+            'Discover pre-loved treasures',
+          ),
+          const SizedBox(height: 16),
+          _buildFeatureCard(
+            Icons.trending_up,
+            'Impact Score',
+            'Track your environmental impact',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureCard(IconData icon, String title, String subtitle) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFF22C55E),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF1F2937),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWhyChooseSection() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      child: Column(
+        children: [
+          const Text(
+            'Why Choose Green Loop?',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "We're revolutionizing fashion with innovative features that make sustainable shopping easy and rewarding.",
+            style: TextStyle(
+              fontSize: 16,
+              color: Color(0xFF6B7280),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomFeatureCards() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildBottomCard(
+                  Icons.recycling,
+                  'Circular Economy',
+                  'Extend the lifecycle of clothing through buying, selling, and renting pre-loved items.',
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildBottomCard(
+                  Icons.eco,
+                  'Sustainability Tracking',
+                  'Monitor your environmental impact with detailed sustainability metrics and scoring.',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildBottomCard(
+            Icons.verified_user,
+            'Quality Assurance',
+            'Every item is verified for quality and authenticity before listing on our platform.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomCard(IconData icon, String title, String description) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFF22C55E), size: 32),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF1F2937),
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
+            style: const TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigation() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFF22C55E),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildBottomNavItem(Icons.home, 'Home', 0),
+          _buildBottomNavItem(Icons.shopping_bag, 'Marketplace', 1),
+          _buildBottomNavItem(Icons.favorite, 'Loved', 2),
+          _buildBottomNavItem(Icons.person, 'Profile', 3),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavItem(IconData icon, String label, int index) {
+    final isSelected = _selectedIndex == index;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedIndex = index;
+        });
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? Colors.white : Colors.white70,
+            size: 24,
+          ),
+          const SizedBox(height: 4),
+          Container(
+            width: 4,
+            height: 4,
+            decoration: BoxDecoration(
+              color: isSelected ? Colors.white : Colors.transparent,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
