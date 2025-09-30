@@ -71,12 +71,11 @@ class _GreenLoopHomePageState extends State<GreenLoopHomePage> {
         color: Color(0xFF22C55E),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildBottomNavItem(Icons.home, 'Home', 0),
-          _buildBottomNavItem(Icons.shopping_bag, 'Marketplace', 1),
-          _buildBottomNavItem(Icons.favorite, 'Loved', 2),
-          _buildBottomNavItem(Icons.person, 'Profile', 3),
+          Expanded(child: _buildBottomNavItem(Icons.home, 'Home', 0)),
+          Expanded(child: _buildBottomNavItem(Icons.shopping_bag, 'Marketplace', 1)),
+          Expanded(child: _buildBottomNavItem(Icons.favorite, 'Loved', 2)),
+          Expanded(child: _buildBottomNavItem(Icons.person, 'Profile', 3)),
         ],
       ),
     );
@@ -98,14 +97,14 @@ class _GreenLoopHomePageState extends State<GreenLoopHomePage> {
           children: [
             Icon(
               icon,
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.6),
+              color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.6),
               size: 24,
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? Colors.white : Colors.white.withOpacity(0.6),
+                color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.6),
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
