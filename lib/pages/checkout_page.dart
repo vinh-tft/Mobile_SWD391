@@ -698,18 +698,35 @@ class _CheckoutPageState extends State<CheckoutPage> {
             ),
             child: Row(
               children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.image,
-                    color: Color(0xFF6B7280),
-                    size: 40,
-                  ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: (widget.product['images'] is List && (widget.product['images'] as List).isNotEmpty)
+                      ? Image.network(
+                          (widget.product['images'] as List).first,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            width: 80,
+                            height: 80,
+                            color: const Color(0xFFF3F4F6),
+                            child: const Icon(
+                              Icons.broken_image,
+                              color: Color(0xFF6B7280),
+                              size: 40,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: 80,
+                          height: 80,
+                          color: const Color(0xFFF3F4F6),
+                          child: const Icon(
+                            Icons.image,
+                            color: Color(0xFF6B7280),
+                            size: 40,
+                          ),
+                        ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(

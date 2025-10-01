@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'product_detail_page.dart';
 import 'checkout_page.dart';
+import 'posts_page.dart';
 
 class MarketplacePage extends StatefulWidget {
   const MarketplacePage({super.key});
@@ -11,9 +12,9 @@ class MarketplacePage extends StatefulWidget {
 
 class _MarketplacePageState extends State<MarketplacePage> {
   final TextEditingController _searchController = TextEditingController();
-  String _selectedCategory = 'All';
+  String _selectedCategory = 'Clothing';
   String _selectedSort = 'Popular';
-  List<String> _categories = ['All', 'Clothing', 'Shoes', 'Accessories', 'Bags', 'Jewelry'];
+  List<String> _categories = ['Clothing'];
   List<String> _sortOptions = ['Popular', 'Price Low to High', 'Price High to Low', 'Newest', 'Rating'];
   
   @override
@@ -105,9 +106,9 @@ class _MarketplacePageState extends State<MarketplacePage> {
                   children: [
                     Expanded(child: _buildCategoryCard('Clothing', Icons.checkroom)),
                     const SizedBox(width: 12),
-                    Expanded(child: _buildCategoryCard('Shoes', Icons.shopping_bag)),
+                    const Expanded(child: SizedBox()),
                     const SizedBox(width: 12),
-                    Expanded(child: _buildCategoryCard('Accessories', Icons.watch)),
+                    const Expanded(child: SizedBox()),
                   ],
                 ),
               ],
@@ -137,7 +138,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                         crossAxisCount: 2,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
-                        childAspectRatio: 0.75,
+                        childAspectRatio: 0.68,
                         children: _getFilteredProducts().map((product) {
                           return _buildProductCard(
                             context,
@@ -199,11 +200,19 @@ class _MarketplacePageState extends State<MarketplacePage> {
               ],
             ),
           ),
-          // Theme toggle
-          const Icon(
-            Icons.wb_sunny_outlined,
-            color: Color(0xFF6B7280),
-            size: 24,
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.article_outlined, color: Color(0xFF6B7280), size: 24),
+                tooltip: 'Bài đăng',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PostsPage()),
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),
@@ -303,12 +312,32 @@ class _MarketplacePageState extends State<MarketplacePage> {
                 ),
                 child: Stack(
                   children: [
-                    const Center(
-                      child: Icon(
-                        Icons.image,
-                        color: Color(0xFF6B7280),
-                        size: 40,
+                    ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
                       ),
+                      child: images.isNotEmpty
+                          ? Image.network(
+                              images.first,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const Center(
+                                child: Icon(
+                                  Icons.broken_image,
+                                  color: Color(0xFF6B7280),
+                                  size: 40,
+                                ),
+                              ),
+                            )
+                          : const Center(
+                              child: Icon(
+                                Icons.image,
+                                color: Color(0xFF6B7280),
+                                size: 40,
+                              ),
+                            ),
                     ),
                     // Favorite button
                     Positioned(
@@ -520,48 +549,41 @@ class _MarketplacePageState extends State<MarketplacePage> {
         'price': '1.050.000 VND',
         'rating': '4.8',
         'description': 'Áo khoác denim vintage từ thập niên 90. Tình trạng hoàn hảo với vết mòn tự nhiên tạo nét đặc trưng. Làm từ 100% cotton denim.',
-        'images': ['jacket1.jpg', 'jacket2.jpg'],
+        'images': ['https://images.unsplash.com/photo-1548883354-94bcfe321c35?q=80&w=1200&auto=format&fit=crop', 'https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=1200&auto=format&fit=crop'],
         'seller': 'Sarah Johnson',
         'condition': 'Excellent',
         'size': 'M',
         'brand': 'Levi\'s',
         'category': 'Clothing',
       },
-      {
-        'title': 'Giày sneaker eco',
-        'price': '1.550.000 VND',
-        'rating': '4.9',
-        'description': 'Giày sneaker bền vững làm từ vật liệu tái chế. Thoải mái, thời trang và thân thiện với môi trường. Hoàn hảo cho việc sử dụng hàng ngày.',
-        'images': ['sneakers1.jpg', 'sneakers2.jpg'],
-        'seller': 'Mike Chen',
-        'condition': 'Like New',
-        'size': '9',
-        'brand': 'Allbirds',
-        'category': 'Shoes',
-      },
+      
       {
         'title': 'Áo thun cotton hữu cơ',
         'price': '595.000 VND',
         'rating': '4.7',
         'description': 'Áo thun cotton hữu cơ mềm mại trong tình trạng hoàn hảo. Vải thoáng khí, vừa vặn thoải mái và sản xuất bền vững.',
-        'images': ['tshirt1.jpg'],
+        'images': ['https://images.unsplash.com/photo-1512436991641-6745cdb1723f?q=80&w=1200&auto=format&fit=crop'],
         'seller': 'Emma Wilson',
         'condition': 'Good',
         'size': 'L',
         'brand': 'Patagonia',
         'category': 'Clothing',
       },
+      
       {
-        'title': 'Ba lô bền vững',
-        'price': '2.025.000 VND',
-        'rating': '4.8',
-        'description': 'Ba lô bền bỉ làm từ chai nhựa tái chế. Nhiều ngăn, túi laptop và vật liệu chống nước.',
-        'images': ['backpack1.jpg', 'backpack2.jpg'],
-        'seller': 'David Kim',
-        'condition': 'Excellent',
-        'size': 'One Size',
-        'brand': 'Fjällräven',
-        'category': 'Bags',
+        'title': 'Set quần áo tái chế thân thiện môi trường',
+        'price': '845.000 VND',
+        'rating': '4.9',
+        'description': 'Bộ quần áo làm từ sợi tái chế (PET) và cotton hữu cơ. Mềm mại, bền bỉ và giảm phát thải. Phù hợp đi làm và dạo phố.',
+        'images': [
+          'https://images.unsplash.com/photo-1520975916090-95b1e2b3b1e1?q=80&w=1200&auto=format&fit=crop',
+          'https://images.unsplash.com/photo-1521335629791-ce4aec67dd53?q=80&w=1200&auto=format&fit=crop'
+        ],
+        'seller': 'Green Studio',
+        'condition': 'Like New',
+        'size': 'M',
+        'brand': 'ReWear',
+        'category': 'Clothing',
       },
     ];
 

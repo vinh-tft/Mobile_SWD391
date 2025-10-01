@@ -170,16 +170,24 @@ class ProductDetailPage extends StatelessWidget {
       child: PageView.builder(
         itemCount: images.length,
         itemBuilder: (context, index) {
+          final imageUrl = images[index];
           return Container(
             margin: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
               color: const Color(0xFFF9FAFB),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.image,
-              color: Color(0xFF6B7280),
-              size: 80,
+            clipBehavior: Clip.antiAlias,
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => const Center(
+                child: Icon(
+                  Icons.broken_image,
+                  color: Color(0xFF6B7280),
+                  size: 80,
+                ),
+              ),
             ),
           );
         },

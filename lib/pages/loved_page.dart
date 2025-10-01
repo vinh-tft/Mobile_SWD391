@@ -15,7 +15,10 @@ class _LovedPageState extends State<LovedPage> {
       'price': '1.050.000 VND',
       'rating': '4.8',
       'description': 'Áo khoác denim vintage từ thập niên 90. Tình trạng hoàn hảo với vết mòn tự nhiên tạo nét đặc trưng. Làm từ 100% cotton denim.',
-      'images': ['jacket1.jpg', 'jacket2.jpg'],
+      'images': [
+        'https://images.unsplash.com/photo-1548883354-94bcfe321c35?q=80&w=1200&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=1200&auto=format&fit=crop'
+      ],
       'seller': 'Sarah Johnson',
       'condition': 'Excellent',
       'size': 'M',
@@ -27,7 +30,10 @@ class _LovedPageState extends State<LovedPage> {
       'price': '1.550.000 VND',
       'rating': '4.9',
       'description': 'Giày sneaker bền vững làm từ vật liệu tái chế. Thoải mái, thời trang và thân thiện với môi trường. Hoàn hảo cho việc sử dụng hàng ngày.',
-      'images': ['sneakers1.jpg', 'sneakers2.jpg'],
+      'images': [
+        'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1200&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1520256862855-398228c41684?q=80&w=1200&auto=format&fit=crop'
+      ],
       'seller': 'Mike Chen',
       'condition': 'Like New',
       'size': '9',
@@ -230,18 +236,27 @@ class _LovedPageState extends State<LovedPage> {
           child: Row(
             children: [
               // Product Image
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.image,
-                  color: Color(0xFF6B7280),
-                  size: 32,
-                ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: (item['images'] is List && (item['images'] as List).isNotEmpty)
+                    ? Image.network(
+                        (item['images'] as List).first,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 80,
+                          height: 80,
+                          color: const Color(0xFFF3F4F6),
+                          child: const Icon(Icons.broken_image, color: Color(0xFF6B7280), size: 32),
+                        ),
+                      )
+                    : Container(
+                        width: 80,
+                        height: 80,
+                        color: const Color(0xFFF3F4F6),
+                        child: const Icon(Icons.image, color: Color(0xFF6B7280), size: 32),
+                      ),
               ),
               const SizedBox(width: 16),
               // Product Info

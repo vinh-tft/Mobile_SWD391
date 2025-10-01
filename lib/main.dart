@@ -3,6 +3,7 @@ import 'pages/home_page.dart';
 import 'pages/marketplace_page.dart';
 import 'pages/loved_page.dart';
 import 'pages/profile_page.dart';
+import 'pages/posts_page.dart';
 
 void main() {
   runApp(const GreenLoopApp());
@@ -56,8 +57,10 @@ class _GreenLoopHomePageState extends State<GreenLoopHomePage> {
       case 1:
         return const MarketplacePage();
       case 2:
-        return const LovedPage();
+        return const PostsPage();
       case 3:
+        return const LovedPage();
+      case 4:
         return const ProfilePage();
       default:
         return const HomePage();
@@ -73,9 +76,10 @@ class _GreenLoopHomePageState extends State<GreenLoopHomePage> {
       child: Row(
         children: [
           Expanded(child: _buildBottomNavItem(Icons.home, 'Home', 0)),
-          Expanded(child: _buildBottomNavItem(Icons.shopping_bag, 'Marketplace', 1)),
-          Expanded(child: _buildBottomNavItem(Icons.favorite, 'Loved', 2)),
-          Expanded(child: _buildBottomNavItem(Icons.person, 'Profile', 3)),
+          Expanded(child: _buildBottomNavItem(Icons.shopping_bag, 'Market', 1)),
+          Expanded(child: _buildBottomNavItem(Icons.article, 'Posts', 2)),
+          Expanded(child: _buildBottomNavItem(Icons.favorite, 'Loved', 3)),
+          Expanded(child: _buildBottomNavItem(Icons.person, 'Profile', 4)),
         ],
       ),
     );
@@ -103,6 +107,9 @@ class _GreenLoopHomePageState extends State<GreenLoopHomePage> {
             const SizedBox(height: 4),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
               style: TextStyle(
                 color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.6),
                 fontSize: 12,
