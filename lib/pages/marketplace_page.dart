@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
+import 'create_listing_page.dart';
 import 'product_detail_page.dart';
 import 'checkout_page.dart';
 import 'posts_page.dart';
@@ -25,6 +28,28 @@ class _MarketplacePageState extends State<MarketplacePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isSeller = context.select<AuthService, bool>((a) => a.isSeller);
+    return Scaffold(
+      backgroundColor: Colors.white,
+      floatingActionButton: isSeller
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CreateListingPage()),
+                );
+              },
+              backgroundColor: const Color(0xFF22C55E),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_circle_outline),
+              label: const Text('Đăng sản phẩm', style: TextStyle(fontWeight: FontWeight.w600)),
+            )
+          : null,
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
     return SingleChildScrollView(
       child: Column(
         children: [

@@ -4,9 +4,17 @@ import 'pages/marketplace_page.dart';
 import 'pages/loved_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/posts_page.dart';
+import 'pages/login_page.dart';
+import 'services/auth_service.dart';
+import 'package:provider/provider.dart';
 
 void main() {
-  runApp(const GreenLoopApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => AuthService(),
+      child: const GreenLoopApp(),
+    ),
+  );
 }
 
 class GreenLoopApp extends StatelessWidget {
@@ -41,12 +49,22 @@ class _GreenLoopHomePageState extends State<GreenLoopHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: _getCurrentPage(),
-      ),
-      bottomNavigationBar: _buildBottomNavigation(),
+    return Consumer<AuthService>(
+      builder: (context, authService, child) {
+        // Nếu chưa đăng nhập, hiển thị trang đăng nhập
+        if (!authService.isLoggedIn) {
+          return const LoginPage();
+        }
+
+        // Nếu đã đăng nhập, hiển thị trang chính
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: _getCurrentPage(),
+          ),
+          bottomNavigationBar: _buildBottomNavigation(),
+        );
+      },
     );
   }
 

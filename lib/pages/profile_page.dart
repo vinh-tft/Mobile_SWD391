@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -14,81 +16,105 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // Header Section
-          _buildHeader(),
-          
-          // Profile Title
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: const Text(
-              'Profile',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1F2937),
-              ),
-            ),
-          ),
-          
-          // Profile Info
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                const CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Color(0xFF22C55E),
-                  child: Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 40,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'John Doe',
+    return Consumer<AuthService>(
+      builder: (context, authService, child) {
+        final user = authService.currentUser;
+        
+        return SingleChildScrollView(
+          child: Column(
+            children: [
+              // Header Section
+              _buildHeader(),
+              
+              // Profile Title
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                child: const Text(
+                  'Profile',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF1F2937),
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'john.doe@example.com',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF6B7280),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildProfileStat('12', 'Items Bought'),
-                    _buildProfileStat('5', 'Items Sold'),
-                    _buildProfileStat('4.9', 'Rating'),
+              ),
+              
+              // Profile Info
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 40,
+                      backgroundColor: user?.isSeller == true 
+                          ? const Color(0xFF3B82F6) 
+                          : const Color(0xFF22C55E),
+                      child: Icon(
+                        user?.isSeller == true ? Icons.store : Icons.person,
+                        color: Colors.white,
+                        size: 40,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      user?.name ?? 'Người dùng',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      user?.email ?? 'email@example.com',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                    if (user?.isSeller == true) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF3B82F6).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'Người bán',
+                          style: TextStyle(
+                            color: Color(0xFF3B82F6),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildProfileStat('12', 'Items Bought'),
+                        _buildProfileStat('5', 'Items Sold'),
+                        _buildProfileStat('4.9', 'Rating'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
           
           // Menu Options
           Container(
@@ -106,6 +132,8 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
+    );
+      },
     );
   }
 
@@ -464,19 +492,21 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+        title: const Text('Đăng xuất'),
+        content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Hủy'),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
+              final authService = Provider.of<AuthService>(context, listen: false);
+              authService.logout();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Logged out successfully'),
+                  content: Text('Đăng xuất thành công'),
                   backgroundColor: Color(0xFF22C55E),
                 ),
               );
@@ -485,7 +515,7 @@ class _ProfilePageState extends State<ProfilePage> {
               backgroundColor: const Color(0xFF22C55E),
               foregroundColor: Colors.white,
             ),
-            child: const Text('Logout'),
+            child: const Text('Đăng xuất'),
           ),
         ],
       ),
