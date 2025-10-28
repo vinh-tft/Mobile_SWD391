@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import '../services/clothing_service.dart';
+import '../models/clothing_item.dart';
 import 'create_listing_page.dart';
 import 'product_detail_page.dart';
 import 'checkout_page.dart';
@@ -28,39 +30,28 @@ class _MarketplacePageState extends State<MarketplacePage> {
 
   @override
   Widget build(BuildContext context) {
-    final isSeller = context.select<AuthService, bool>((a) => a.isSeller);
+    return Consumer2<AuthService, ClothingService>(
+      builder: (context, authService, clothingService, child) {
     return Scaffold(
       backgroundColor: Colors.white,
-      floatingActionButton: isSeller
-          ? FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CreateListingPage()),
-                );
-              },
-              backgroundColor: const Color(0xFF22C55E),
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Đăng sản phẩm', style: TextStyle(fontWeight: FontWeight.w600)),
-            )
-          : null,
-      body: _buildBody(),
+          body: _buildBody(authService, clothingService),
+        );
+      },
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(AuthService authService, ClothingService clothingService) {
     return SingleChildScrollView(
       child: Column(
         children: [
           // Header Section
-          _buildHeader(),
+          _buildHeader(authService),
           
           // Marketplace Title
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
             child: const Text(
-              'Marketplace',
+              'Cửa hàng quần áo',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
@@ -86,7 +77,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                   child: TextField(
                     controller: _searchController,
                     decoration: const InputDecoration(
-                      hintText: 'Search for sustainable fashion...',
+                      hintText: 'Tìm kiếm quần áo...',
                       hintStyle: TextStyle(
                         color: Color(0xFF6B7280),
                         fontSize: 16,
@@ -110,7 +101,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
           _buildCategoryFilter(),
           
           // Sort and Results
-          _buildSortAndResults(),
+          _buildSortAndResults(clothingService),
           
           // Categories
           Container(
@@ -119,7 +110,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Categories',
+                  'Danh mục',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -129,11 +120,13 @@ class _MarketplacePageState extends State<MarketplacePage> {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    Expanded(child: _buildCategoryCard('Clothing', Icons.checkroom)),
+                    Expanded(child: _buildCategoryCard('Áo', Icons.checkroom)),
                     const SizedBox(width: 12),
-                    const Expanded(child: SizedBox()),
+                    Expanded(child: _buildCategoryCard('Quần', Icons.accessibility)),
                     const SizedBox(width: 12),
-                    const Expanded(child: SizedBox()),
+                    Expanded(child: _buildCategoryCard('Giày', Icons.sports_soccer)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildCategoryCard('Khác', Icons.more_horiz)),
                   ],
                 ),
               ],
@@ -147,7 +140,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Featured Products',
+                  'Quần áo có sẵn',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -155,7 +148,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _getFilteredProducts().isEmpty
+                _getFilteredClothing(clothingService).isEmpty
                     ? _buildEmptyState()
                     : GridView.count(
                         shrinkWrap: true,
@@ -164,19 +157,8 @@ class _MarketplacePageState extends State<MarketplacePage> {
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
                         childAspectRatio: 0.68,
-                        children: _getFilteredProducts().map((product) {
-                          return _buildProductCard(
-                            context,
-                            product['title'],
-                            product['price'],
-                            product['rating'],
-                            product['description'],
-                            product['images'],
-                            product['seller'],
-                            product['condition'],
-                            product['size'],
-                            product['brand'],
-                          );
+                        children: _getFilteredClothing(clothingService).map((item) {
+                          return _buildClothingCard(context, item);
                         }).toList(),
                       ),
               ],
@@ -187,7 +169,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(AuthService authService) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
@@ -522,14 +504,14 @@ class _MarketplacePageState extends State<MarketplacePage> {
     );
   }
 
-  Widget _buildSortAndResults() {
+  Widget _buildSortAndResults(ClothingService clothingService) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            '${_getFilteredProducts().length} items found',
+            '${_getFilteredClothing(clothingService).length} sản phẩm',
             style: const TextStyle(
               fontSize: 14,
               color: Color(0xFF6B7280),
@@ -540,7 +522,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
             child: Row(
               children: [
                 const Text(
-                  'Sort by: ',
+                  'Sắp xếp: ',
                   style: TextStyle(
                     fontSize: 14,
                     color: Color(0xFF6B7280),
@@ -567,65 +549,199 @@ class _MarketplacePageState extends State<MarketplacePage> {
     );
   }
 
-  List<Map<String, dynamic>> _getFilteredProducts() {
-    List<Map<String, dynamic>> products = [
-      {
-        'title': 'Áo khoác denim vintage',
-        'price': '1.050.000 VND',
-        'rating': '4.8',
-        'description': 'Áo khoác denim vintage từ thập niên 90. Tình trạng hoàn hảo với vết mòn tự nhiên tạo nét đặc trưng. Làm từ 100% cotton denim.',
-        'images': ['https://images.unsplash.com/photo-1548883354-94bcfe321c35?q=80&w=1200&auto=format&fit=crop', 'https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=1200&auto=format&fit=crop'],
-        'seller': 'Sarah Johnson',
-        'condition': 'Excellent',
-        'size': 'M',
-        'brand': 'Levi\'s',
-        'category': 'Clothing',
-      },
-      
-      {
-        'title': 'Áo thun cotton hữu cơ',
-        'price': '595.000 VND',
-        'rating': '4.7',
-        'description': 'Áo thun cotton hữu cơ mềm mại trong tình trạng hoàn hảo. Vải thoáng khí, vừa vặn thoải mái và sản xuất bền vững.',
-        'images': ['https://images.unsplash.com/photo-1512436991641-6745cdb1723f?q=80&w=1200&auto=format&fit=crop'],
-        'seller': 'Emma Wilson',
-        'condition': 'Good',
-        'size': 'L',
-        'brand': 'Patagonia',
-        'category': 'Clothing',
-      },
-      
-      {
-        'title': 'Set quần áo tái chế thân thiện môi trường',
-        'price': '845.000 VND',
-        'rating': '4.9',
-        'description': 'Bộ quần áo làm từ sợi tái chế (PET) và cotton hữu cơ. Mềm mại, bền bỉ và giảm phát thải. Phù hợp đi làm và dạo phố.',
-        'images': [
-          'https://images.unsplash.com/photo-1520975916090-95b1e2b3b1e1?q=80&w=1200&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1521335629791-ce4aec67dd53?q=80&w=1200&auto=format&fit=crop'
-        ],
-        'seller': 'Green Studio',
-        'condition': 'Like New',
-        'size': 'M',
-        'brand': 'ReWear',
-        'category': 'Clothing',
-      },
-    ];
-
-    // Filter by category
-    if (_selectedCategory != 'All') {
-      products = products.where((product) => product['category'] == _selectedCategory).toList();
-    }
+  List<ClothingItem> _getFilteredClothing(ClothingService clothingService) {
+    List<ClothingItem> items = clothingService.clothingItems;
 
     // Filter by search
     if (_searchController.text.isNotEmpty) {
-      products = products.where((product) => 
-        product['title'].toLowerCase().contains(_searchController.text.toLowerCase()) ||
-        product['brand'].toLowerCase().contains(_searchController.text.toLowerCase())
-      ).toList();
+      items = clothingService.searchClothing(_searchController.text);
     }
 
-    return products;
+    return items;
+  }
+
+  Widget _buildClothingCard(BuildContext context, ClothingItem item) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailPage(
+              title: item.name,
+              price: '${item.pointValue} điểm',
+              rating: '4.5',
+              description: item.description,
+              images: item.images,
+              seller: 'Cửa hàng',
+              condition: item.conditionDisplayName,
+              size: item.size,
+              brand: item.brand,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Product Image
+            Expanded(
+              flex: 3,
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FAFB),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
+                      ),
+                      child: item.images.isNotEmpty
+                          ? Image.network(
+                              item.images.first,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const Center(
+                                child: Icon(
+                                  Icons.broken_image,
+                                  color: Color(0xFF6B7280),
+                                  size: 40,
+                                ),
+                              ),
+                            )
+                          : const Center(
+                              child: Icon(
+                                Icons.image,
+                                color: Color(0xFF6B7280),
+                                size: 40,
+                              ),
+                            ),
+                    ),
+                    // Category badge
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E).withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          item.categoryDisplayName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Product Info
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      style: const TextStyle(
+                        color: Color(0xFF1F2937),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22C55E).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            item.conditionDisplayName,
+                            style: const TextStyle(
+                              color: Color(0xFF22C55E),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Size: ${item.size}',
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${item.pointValue} điểm',
+                            style: const TextStyle(
+                              color: Color(0xFF22C55E),
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22C55E).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_forward_ios,
+                            color: Color(0xFF22C55E),
+                            size: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showFilterBottomSheet() {
@@ -861,7 +977,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'No items found',
+            'Không tìm thấy sản phẩm',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -870,7 +986,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Try adjusting your search or filters',
+            'Thử điều chỉnh từ khóa tìm kiếm hoặc bộ lọc',
             style: TextStyle(
               fontSize: 14,
               color: Color(0xFF6B7280),
@@ -882,7 +998,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
             onPressed: () {
               setState(() {
                 _searchController.clear();
-                _selectedCategory = 'All';
+                _selectedCategory = 'Clothing';
               });
             },
             style: ElevatedButton.styleFrom(
@@ -893,7 +1009,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text('Clear Filters'),
+            child: const Text('Xóa bộ lọc'),
           ),
         ],
       ),

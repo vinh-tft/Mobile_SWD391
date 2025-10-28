@@ -1,4 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
+import '../services/clothing_service.dart';
+import 'marketplace_page.dart';
+import 'profile_page.dart';
+import 'recharge_page.dart';
+import 'staff_recharge_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -47,44 +54,48 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: Column(
-            children: [
-              // Header Section
-              _buildHeader(),
-              
-              // Hero Section
-              _buildHeroSection(),
-              
-              // Quick Actions
-              _buildQuickActions(),
-              
-              // Statistics Section
-              _buildStatistics(),
-              
-              // Feature Cards Section
-              _buildFeatureCards(),
-              
-              // Why Choose Section
-              _buildWhyChooseSection(),
-              
-              // Bottom Feature Cards
-              _buildBottomFeatureCards(),
-              
-              // Newsletter Section
-              _buildNewsletterSection(),
-            ],
+    return Consumer2<AuthService, ClothingService>(
+      builder: (context, authService, clothingService, child) {
+        return SingleChildScrollView(
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: Column(
+                children: [
+                  // Header Section
+                  _buildHeader(authService),
+                  
+                  // Hero Section
+                  _buildHeroSection(authService),
+                  
+                  // Quick Actions
+                  _buildQuickActions(authService),
+                  
+                  // Statistics Section
+                  _buildStatistics(),
+                  
+                  // Feature Cards Section
+                  _buildFeatureCards(authService),
+                  
+                  // Why Choose Section
+                  _buildWhyChooseSection(),
+                  
+                  // Bottom Feature Cards
+                  _buildBottomFeatureCards(),
+                  
+                  // Newsletter Section
+                  _buildNewsletterSection(),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(AuthService authService) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
@@ -122,26 +133,57 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ],
             ),
           ),
-          // Theme toggle
-          const Icon(
-            Icons.wb_sunny_outlined,
-            color: Color(0xFF6B7280),
-            size: 24,
+          // User info
+          Row(
+            children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.stars,
+                          color: Color(0xFF22C55E),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${authService.currentUser?.points ?? 0} điểm',
+                          style: const TextStyle(
+                            color: Color(0xFF22C55E),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.notifications_outlined,
+                color: Color(0xFF6B7280),
+                size: 24,
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHeroSection() {
+  Widget _buildHeroSection(AuthService authService) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
       child: Column(
         children: [
-          const Text(
-            'Circular Fashion for a Greener Future',
-            style: TextStyle(
-              fontSize: 32,
+          Text(
+            authService.isStaff ? 'Quản lý cửa hàng' : 'Cửa hàng quần áo xanh',
+            style: const TextStyle(
+              fontSize: 28,
               fontWeight: FontWeight.bold,
               color: Color(0xFF1F2937),
               height: 1.2,
@@ -149,9 +191,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Join the sustainable fashion revolution. Buy, sell, and trade pre-loved clothing to reduce waste and create a circular economy.',
-            style: TextStyle(
+          Text(
+            authService.isStaff 
+                ? 'Nạp điểm cho khách hàng, quản lý kho hàng và xem giao dịch'
+                : 'Nạp điểm, mua quần áo bằng điểm, hoặc đem quần áo cũ đến cửa hàng để đổi lấy điểm',
+            style: const TextStyle(
               fontSize: 16,
               color: Color(0xFF6B7280),
               height: 1.5,
@@ -162,11 +206,33 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           Row(
             children: [
               Expanded(
-                child: _buildButton('Start Shopping', true),
+                child: _buildButton(
+                  authService.isStaff ? 'Nạp điểm cho KH' : 'Nạp điểm', 
+                  true, 
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => authService.isStaff 
+                            ? const StaffRechargePage()
+                            : const RechargePage(),
+                      ),
+                    );
+                  }
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildButton('Learn More', false),
+                child: _buildButton(
+                  authService.isStaff ? 'Quản lý kho' : 'Mua quần áo', 
+                  false, 
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MarketplacePage()),
+                    );
+                  }
+                ),
               ),
             ],
           ),
@@ -175,21 +241,24 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildButton(String text, bool isPrimary) {
-    return Container(
-      height: 48,
-      decoration: BoxDecoration(
-        color: isPrimary ? const Color(0xFF22C55E) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        border: isPrimary ? null : Border.all(color: const Color(0xFF22C55E)),
-      ),
-      child: Center(
-        child: Text(
-          text,
-          style: TextStyle(
-            color: isPrimary ? Colors.white : const Color(0xFF22C55E),
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+  Widget _buildButton(String text, bool isPrimary, [VoidCallback? onTap]) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: isPrimary ? const Color(0xFF22C55E) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: isPrimary ? null : Border.all(color: const Color(0xFF22C55E)),
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: isPrimary ? Colors.white : const Color(0xFF22C55E),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),
@@ -232,30 +301,30 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildFeatureCards() {
+  Widget _buildFeatureCards(AuthService authService) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'How It Works',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
+            const Text(
+              'Cách thức hoạt động',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F2937),
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(child: _buildFeatureCard('Upload', 'List your items', Icons.upload)),
-              const SizedBox(width: 16),
-              Expanded(child: _buildFeatureCard('Browse', 'Find treasures', Icons.search)),
-              const SizedBox(width: 16),
-              Expanded(child: _buildFeatureCard('Trade', 'Swap & save', Icons.swap_horiz)),
-            ],
-          ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(child: _buildFeatureCard('Nạp điểm', 'Nạp điểm vào tài khoản', Icons.account_balance_wallet)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildFeatureCard('Mua sắm', 'Dùng điểm mua quần áo', Icons.shopping_bag)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildFeatureCard('Đổi quần áo', 'Đem quần áo cũ đến cửa hàng', Icons.swap_horiz)),
+              ],
+            ),
         ],
       ),
     );
@@ -477,14 +546,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(AuthService authService) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Quick Actions',
+            'Chức năng chính',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -493,19 +562,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 16),
           Row(
-            children: [
+            children: authService.isStaff ? [
               Expanded(
                 child: _buildQuickActionCard(
-                  'Browse Items',
-                  Icons.shopping_bag,
+                  'Nạp điểm cho KH',
+                  Icons.account_balance_wallet,
                   const Color(0xFF22C55E),
                   () {
-                    // Navigate to marketplace
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Navigate to Marketplace'),
-                        backgroundColor: Color(0xFF22C55E),
-                      ),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const StaffRechargePage()),
                     );
                   },
                 ),
@@ -513,15 +579,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildQuickActionCard(
-                  'Sell Items',
-                  Icons.add_circle,
+                  'Quản lý kho',
+                  Icons.inventory,
                   const Color(0xFF3B82F6),
                   () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Start Selling'),
-                        backgroundColor: Color(0xFF3B82F6),
-                      ),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MarketplacePage()),
                     );
                   },
                 ),
@@ -529,16 +593,50 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildQuickActionCard(
-                  'My Orders',
-                  Icons.receipt,
+                  'Xem giao dịch',
+                  Icons.receipt_long,
                   const Color(0xFF8B5CF6),
                   () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('View Orders'),
-                        backgroundColor: Color(0xFF8B5CF6),
-                      ),
+                    // Navigation sẽ được xử lý bởi bottom navigation
+                  },
+                ),
+              ),
+            ] : [
+              Expanded(
+                child: _buildQuickActionCard(
+                  'Nạp điểm',
+                  Icons.account_balance_wallet,
+                  const Color(0xFF22C55E),
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const RechargePage()),
                     );
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildQuickActionCard(
+                  'Mua quần áo',
+                  Icons.shopping_bag,
+                  const Color(0xFF3B82F6),
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MarketplacePage()),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildQuickActionCard(
+                  'Đổi quần áo',
+                  Icons.swap_horiz,
+                  const Color(0xFF8B5CF6),
+                  () {
+                    _showExchangeDialog(context, authService);
                   },
                 ),
               ),
@@ -679,6 +777,71 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 child: const Text('Subscribe'),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  void _showExchangeDialog(BuildContext context, AuthService authService) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Đổi quần áo lấy điểm'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.store,
+              size: 64,
+              color: Color(0xFF22C55E),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Đem quần áo cũ đến cửa hàng để đổi lấy điểm',
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Địa chỉ: 123 Đường ABC, Quận 1, TP.HCM',
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF6B7280),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Giờ mở cửa: 8:00 - 20:00',
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF6B7280),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Đã ghi nhận! Hãy đến cửa hàng để đổi quần áo'),
+                  backgroundColor: Color(0xFF22C55E),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF22C55E),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Xác nhận'),
           ),
         ],
       ),
