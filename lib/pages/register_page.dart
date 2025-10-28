@@ -102,7 +102,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Tham gia cộng đồng thời trang bền vững',
+          'Đăng ký để bán quần áo lấy điểm và mua sắm bền vững',
           style: TextStyle(
             fontSize: 16,
             color: Color(0xFF6B7280),
@@ -405,6 +405,7 @@ class _RegisterPageState extends State<RegisterPage> {
       _nameController.text,
       _emailController.text,
       _passwordController.text,
+      '0123456789', // Số điện thoại mặc định cho demo
     );
 
     setState(() {

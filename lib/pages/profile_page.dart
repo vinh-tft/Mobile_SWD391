@@ -59,11 +59,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     CircleAvatar(
                       radius: 40,
-                      backgroundColor: user?.isSeller == true 
-                          ? const Color(0xFF3B82F6) 
-                          : const Color(0xFF22C55E),
-                      child: Icon(
-                        user?.isSeller == true ? Icons.store : Icons.person,
+                      backgroundColor: const Color(0xFF22C55E),
+                      child: const Icon(
+                        Icons.person,
                         color: Colors.white,
                         size: 40,
                       ),
@@ -85,24 +83,22 @@ class _ProfilePageState extends State<ProfilePage> {
                         color: Color(0xFF6B7280),
                       ),
                     ),
-                    if (user?.isSeller == true) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3B82F6).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          'Người bán',
-                          style: TextStyle(
-                            color: Color(0xFF3B82F6),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF22C55E).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${user?.points ?? 0} điểm',
+                        style: const TextStyle(
+                          color: Color(0xFF22C55E),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ],
+                    ),
                     const SizedBox(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,

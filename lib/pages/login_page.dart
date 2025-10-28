@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'register_page.dart';
-import 'seller_registration_page.dart';
 import '../services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
@@ -64,8 +63,6 @@ class _LoginPageState extends State<LoginPage> {
                 
                 const SizedBox(height: 24),
                 
-                // Đăng ký bán hàng
-                _buildSellerRegistrationSection(),
               ],
             ),
           ),
@@ -105,7 +102,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Đăng nhập để tiếp tục mua sắm bền vững',
+          'Đăng nhập để bán quần áo lấy điểm hoặc quản lý cửa hàng',
           style: TextStyle(
             fontSize: 16,
             color: Color(0xFF6B7280),
@@ -291,75 +288,6 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildSellerRegistrationSection() {
-    return Column(
-      children: [
-        const Row(
-          children: [
-            Expanded(child: Divider(color: Color(0xFFE5E7EB))),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'hoặc',
-                style: TextStyle(
-                  color: Color(0xFF6B7280),
-                  fontSize: 14,
-                ),
-              ),
-            ),
-            Expanded(child: Divider(color: Color(0xFFE5E7EB))),
-          ],
-        ),
-        const SizedBox(height: 24),
-        
-        SizedBox(
-          height: 56,
-          child: OutlinedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SellerRegistrationPage()),
-              );
-            },
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFF22C55E), width: 2),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.store,
-                  color: Color(0xFF22C55E),
-                  size: 20,
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'Đăng ký bán hàng',
-                  style: TextStyle(
-                    color: Color(0xFF22C55E),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Tạo cửa hàng và bắt đầu bán hàng ngay hôm nay',
-          style: TextStyle(
-            color: Color(0xFF6B7280),
-            fontSize: 12,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
 
   void _handleLogin() async {
     if (!_formKey.currentState!.validate()) {

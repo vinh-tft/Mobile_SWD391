@@ -1,23 +1,27 @@
 import 'package:flutter/foundation.dart';
 
+enum UserRole { customer, staff }
+
 class User {
   final String id;
   final String name;
   final String email;
   final String? phone;
-  final bool isSeller;
-  final String? storeName;
-  final String? storeCategory;
-  final String? storeAddress;
+  final UserRole role;
+  final int points; // Số điểm hiện tại
+  final String? staffId; // ID nhân viên (nếu là staff)
+  final String? storeName; // Tên cửa hàng (nếu là staff)
+  final String? storeAddress; // Địa chỉ cửa hàng (nếu là staff)
 
   User({
     required this.id,
     required this.name,
     required this.email,
     this.phone,
-    this.isSeller = false,
+    required this.role,
+    this.points = 0,
+    this.staffId,
     this.storeName,
-    this.storeCategory,
     this.storeAddress,
   });
 
@@ -27,9 +31,13 @@ class User {
       name: json['name'],
       email: json['email'],
       phone: json['phone'],
-      isSeller: json['isSeller'] ?? false,
+      role: UserRole.values.firstWhere(
+        (e) => e.toString() == 'UserRole.${json['role']}',
+        orElse: () => UserRole.customer,
+      ),
+      points: json['points'] ?? 0,
+      staffId: json['staffId'],
       storeName: json['storeName'],
-      storeCategory: json['storeCategory'],
       storeAddress: json['storeAddress'],
     );
   }
@@ -40,11 +48,36 @@ class User {
       'name': name,
       'email': email,
       'phone': phone,
-      'isSeller': isSeller,
+      'role': role.toString().split('.').last,
+      'points': points,
+      'staffId': staffId,
       'storeName': storeName,
-      'storeCategory': storeCategory,
       'storeAddress': storeAddress,
     };
+  }
+
+  User copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? phone,
+    UserRole? role,
+    int? points,
+    String? staffId,
+    String? storeName,
+    String? storeAddress,
+  }) {
+    return User(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      role: role ?? this.role,
+      points: points ?? this.points,
+      staffId: staffId ?? this.staffId,
+      storeName: storeName ?? this.storeName,
+      storeAddress: storeAddress ?? this.storeAddress,
+    );
   }
 }
 
@@ -55,30 +88,32 @@ class AuthService extends ChangeNotifier {
   User? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
   bool get isLoading => _isLoading;
-  bool get isSeller => _currentUser?.isSeller ?? false;
+  bool get isCustomer => _currentUser?.role == UserRole.customer;
+  bool get isStaff => _currentUser?.role == UserRole.staff;
 
   // Demo accounts (email -> (password, user))
   final Map<String, ({String password, User user})> _demoAccounts = {
-    'user@demo.com': (
+    'customer@demo.com': (
       password: '123456',
       user: User(
         id: '1',
-        name: 'Người dùng Demo',
-        email: 'user@demo.com',
+        name: 'Khách hàng Demo',
+        email: 'customer@demo.com',
         phone: '0123456789',
-        isSeller: false,
+        role: UserRole.customer,
+        points: 1000,
       ),
     ),
-    'seller@demo.com': (
+    'staff@demo.com': (
       password: '123456',
       user: User(
         id: '2',
-        name: 'Người bán Demo',
-        email: 'seller@demo.com',
+        name: 'Nhân viên Demo',
+        email: 'staff@demo.com',
         phone: '0987654321',
-        isSeller: true,
-        storeName: 'Cửa hàng Demo',
-        storeCategory: 'Thời trang',
+        role: UserRole.staff,
+        staffId: 'ST001',
+        storeName: 'Cửa hàng Thu mua Quần áo Xanh',
         storeAddress: '123 Đường ABC, Quận 1, TP.HCM',
       ),
     ),
@@ -107,7 +142,7 @@ class AuthService extends ChangeNotifier {
   }
 
   // Giả lập đăng ký
-  Future<bool> register(String name, String email, String password) async {
+  Future<bool> register(String name, String email, String password, String phone) async {
     _isLoading = true;
     notifyListeners();
 
@@ -115,7 +150,7 @@ class AuthService extends ChangeNotifier {
     await Future.delayed(const Duration(seconds: 2));
 
     // Giả lập tạo tài khoản mới
-    if (name.isNotEmpty && email.isNotEmpty && password.isNotEmpty) {
+    if (name.isNotEmpty && email.isNotEmpty && password.isNotEmpty && phone.isNotEmpty) {
       _isLoading = false;
       notifyListeners();
       return true;
@@ -126,39 +161,45 @@ class AuthService extends ChangeNotifier {
     return false;
   }
 
-  // Giả lập đăng ký bán hàng
-  Future<bool> registerSeller({
-    required String ownerName,
-    required String email,
-    required String password,
-    required String phone,
-    required String storeName,
-    required String storeCategory,
-    required String storeAddress,
-  }) async {
-    _isLoading = true;
-    notifyListeners();
+  // Cập nhật điểm cho người dùng
+  void updatePoints(int newPoints) {
+    if (_currentUser != null) {
+      _currentUser = _currentUser!.copyWith(points: newPoints);
+      notifyListeners();
+    }
+  }
 
-    // Giả lập delay
-    await Future.delayed(const Duration(seconds: 3));
+  // Thêm điểm cho người dùng
+  void addPoints(int points) {
+    if (_currentUser != null) {
+      updatePoints(_currentUser!.points + points);
+    }
+  }
 
-    // Giả lập tạo tài khoản người bán
-    if (ownerName.isNotEmpty && email.isNotEmpty && password.isNotEmpty && 
-        phone.isNotEmpty && storeName.isNotEmpty && storeCategory.isNotEmpty && 
-        storeAddress.isNotEmpty) {
+  // Trừ điểm khi mua hàng
+  bool deductPoints(int points) {
+    if (_currentUser != null && _currentUser!.points >= points) {
+      updatePoints(_currentUser!.points - points);
+      return true;
+    }
+    return false;
+  }
+
+  // Nạp điểm (giả lập)
+  Future<bool> rechargePoints(int amount) async {
+    if (_currentUser != null && amount > 0) {
+      _isLoading = true;
+      notifyListeners();
+      
+      // Giả lập delay
+      await Future.delayed(const Duration(seconds: 2));
+      
+      addPoints(amount);
       _isLoading = false;
       notifyListeners();
       return true;
     }
-
-    _isLoading = false;
-    notifyListeners();
     return false;
-  }
-
-  // Đăng nhập với tài khoản người bán (sử dụng cùng nguồn demo)
-  Future<bool> loginAsSeller(String email, String password) async {
-    return login(email, password);
   }
 
   // Đăng xuất
