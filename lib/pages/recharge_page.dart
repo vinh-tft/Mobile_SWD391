@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import '../services/points_service.dart';
 
 class RechargePage extends StatefulWidget {
   const RechargePage({super.key});
@@ -430,13 +431,32 @@ class _RechargePageState extends State<RechargePage> {
     });
 
     final authService = Provider.of<AuthService>(context, listen: false);
-    final success = await authService.rechargePoints(amount);
+    final pointsService = Provider.of<PointsService>(context, listen: false);
+
+    final userId = authService.currentUser?.id;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không tìm thấy người dùng'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final success = await pointsService.adjustPoints(
+      userId: userId,
+      amount: amount,
+      reason: 'recharge_${_selectedPaymentMethod ?? 'unknown'}',
+    );
 
     setState(() {
       _isLoading = false;
     });
 
     if (success) {
+      // Update local points immediately (defensive in case backend mock skips it)
+      authService.addPoints(amount);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Nạp thành công $amount điểm!'),

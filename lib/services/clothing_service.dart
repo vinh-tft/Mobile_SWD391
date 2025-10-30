@@ -96,6 +96,42 @@ class ClothingService extends ChangeNotifier {
         customerId: '1',
         staffId: 'ST001',
       ),
+      ClothingItem(
+        id: '6',
+        name: 'Áo hoodie đỏ',
+        description: 'Áo hoodie nỉ nam, màu đỏ, thời trang, giữ ấm tốt',
+        category: ClothingCategory.jacket,
+        condition: ClothingCondition.good,
+        size: 'L',
+        brand: 'Nike',
+        color: 'Đỏ',
+        images: [
+          'https://down-vn.img.susercontent.com/file/efcfd89e6cbb81e4e6147b28f95ff2c1'
+        ],
+        pointValue: 850,
+        originalPrice: 600000,
+        createdAt: DateTime.now().subtract(const Duration(days: 2)),
+        customerId: '2',
+        staffId: 'ST001',
+      ),
+      ClothingItem(
+        id: '7',
+        name: 'Váy hoa nữ',
+        description: 'Váy hoa mùa hè, chất vải mát nhẹ, nữ tính',
+        category: ClothingCategory.dress,
+        condition: ClothingCondition.excellent,
+        size: 'M',
+        brand: 'H&M',
+        color: 'Hồng',
+        images: [
+          'https://down-vn.img.susercontent.com/file/sg-11134201-22100-jhrp6i9boqiv60'
+        ],
+        pointValue: 700,
+        originalPrice: 450000,
+        createdAt: DateTime.now().subtract(const Duration(days: 1)),
+        customerId: '3',
+        staffId: 'ST001',
+      ),
     ]);
 
     // Thêm một số giao dịch demo

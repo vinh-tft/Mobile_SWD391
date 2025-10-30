@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'chat_page.dart';
+import 'add_sale_item_page.dart';
 
 class PostsPage extends StatefulWidget {
   const PostsPage({super.key});

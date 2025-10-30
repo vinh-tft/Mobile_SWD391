@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import '../services/items_service.dart';
 import '../services/clothing_service.dart';
 import '../models/clothing_item.dart';
+import '../models/api_models.dart';
 import 'create_listing_page.dart';
+import 'add_category_page.dart';
+import 'add_brand_page.dart';
 import 'product_detail_page.dart';
 import 'checkout_page.dart';
 import 'posts_page.dart';
+import 'add_sale_item_page.dart';
 
 class MarketplacePage extends StatefulWidget {
   const MarketplacePage({super.key});
@@ -21,6 +26,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
   String _selectedSort = 'Popular';
   List<String> _categories = ['Clothing'];
   List<String> _sortOptions = ['Popular', 'Price Low to High', 'Price High to Low', 'Newest', 'Rating'];
+  bool _requestedLoad = false;
   
   @override
   void dispose() {
@@ -29,12 +35,41 @@ class _MarketplacePageState extends State<MarketplacePage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // Defer API load to after first frame to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_requestedLoad) {
+        _requestedLoad = true;
+        // Load marketplace-ready items so the product grid shows data
+        context.read<ItemsService>().loadMarketplaceReady();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Consumer2<AuthService, ClothingService>(
       builder: (context, authService, clothingService, child) {
+        // Debug staff status
+        print('🔍 Marketplace - isStaff: ${authService.isStaff}');
+        print('🔍 Marketplace - currentUser: ${authService.currentUser?.role}');
+        
     return Scaffold(
       backgroundColor: Colors.white,
           body: _buildBody(authService, clothingService),
+          // FloatingActionButton cho staff để thêm quần áo
+          floatingActionButton: authService.isStaff ? FloatingActionButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CreateListingPage()),
+              );
+            },
+            backgroundColor: const Color(0xFF22C55E),
+            child: const Icon(Icons.add, color: Colors.white),
+            tooltip: 'Thêm quần áo mới',
+          ) : null,
         );
       },
     );
@@ -47,16 +82,41 @@ class _MarketplacePageState extends State<MarketplacePage> {
           // Header Section
           _buildHeader(authService),
           
-          // Marketplace Title
+          // Sale Title
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: const Text(
-              'Cửa hàng quần áo',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1F2937),
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Bán hàng',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                // Nút thêm quần áo nổi bật cho staff
+                if (authService.isStaff)
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CreateListingPage()),
+                      );
+                    },
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Thêm sale'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF22C55E),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+              ],
             ),
           ),
           
@@ -77,7 +137,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                   child: TextField(
                     controller: _searchController,
                     decoration: const InputDecoration(
-                      hintText: 'Tìm kiếm quần áo...',
+                      hintText: 'Tìm kiếm sale...',
                       hintStyle: TextStyle(
                         color: Color(0xFF6B7280),
                         fontSize: 16,
@@ -133,7 +193,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
             ),
           ),
           
-          // Featured Products
+          // Featured Products (from API)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
             child: Column(
@@ -148,19 +208,66 @@ class _MarketplacePageState extends State<MarketplacePage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _getFilteredClothing(clothingService).isEmpty
-                    ? _buildEmptyState()
-                    : GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 0.68,
-                        children: _getFilteredClothing(clothingService).map((item) {
-                          return _buildClothingCard(context, item);
-                        }).toList(),
-                      ),
+                Consumer<ItemsService>(
+                  builder: (context, itemsService, _) {
+                    // Data rendering
+                    if (itemsService.loading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final items = itemsService.items;
+                    final err = itemsService.error;
+                    if (err != null && items.isEmpty) {
+                      return Container(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.red, size: 32),
+                            const SizedBox(height: 8),
+                            Text(
+                              err,
+                              style: const TextStyle(color: Colors.red),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    if (items.isEmpty) {
+                      return _buildEmptyState();
+                    }
+
+                    return GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.68,
+                      children: items.map((item) {
+                        final title = item.name;
+                        final images = item.primaryImageUrl != null ? [item.primaryImageUrl!] : <String>[];
+                        final condition = item.condition.toString().split('.').last;
+                        final size = item.size;
+                        final brand = item.brandName ?? '';
+                        final pointValue = item.pointValue;
+
+                        return _buildProductCard(
+                          context,
+                          title,
+                          '$pointValue điểm',
+                          '4.5',
+                          item.description,
+                          images,
+                          item.ownerName,
+                          condition,
+                          size,
+                          brand,
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -209,6 +316,78 @@ class _MarketplacePageState extends State<MarketplacePage> {
           ),
           Row(
             children: [
+              // Points chip
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22C55E).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.stars,
+                      color: Color(0xFF22C55E),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${authService.currentUser?.points ?? 0} điểm',
+                      style: const TextStyle(
+                        color: Color(0xFF22C55E),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Nút thêm quần áo và danh mục cho staff
+              if (authService.isStaff) ...[
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline, color: Color(0xFF22C55E), size: 24),
+                  tooltip: 'Thêm quần áo',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CreateListingPage()),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.category_outlined, color: Color(0xFF3B82F6), size: 24),
+                  tooltip: 'Thêm danh mục',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AddCategoryPage()),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.sell_outlined, color: Color(0xFFF59E0B), size: 24),
+                  tooltip: 'Thêm thương hiệu',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AddBrandPage()),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.receipt_long_outlined, color: Color(0xFF10B981), size: 24),
+                  tooltip: 'Thêm sale item',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AddSaleItemPage()),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+              ],
               IconButton(
                 icon: const Icon(Icons.article_outlined, color: Color(0xFF6B7280), size: 24),
                 tooltip: 'Bài đăng',

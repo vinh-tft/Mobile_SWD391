@@ -5,6 +5,7 @@ import '../services/clothing_service.dart';
 import 'marketplace_page.dart';
 import 'profile_page.dart';
 import 'recharge_page.dart';
+import 'login_page.dart';
 import 'staff_recharge_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -210,10 +211,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   authService.isStaff ? 'Nạp điểm cho KH' : 'Nạp điểm', 
                   true, 
                   () {
+                    if (!authService.isLoggedIn) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                      );
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => authService.isStaff 
+                        builder: (context) => authService.isStaff
                             ? const StaffRechargePage()
                             : const RechargePage(),
                       ),
@@ -569,6 +577,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   Icons.account_balance_wallet,
                   const Color(0xFF22C55E),
                   () {
+                    if (!authService.isLoggedIn) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                      );
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const StaffRechargePage()),
@@ -608,6 +623,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   Icons.account_balance_wallet,
                   const Color(0xFF22C55E),
                   () {
+                    if (!authService.isLoggedIn) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                      );
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const RechargePage()),
