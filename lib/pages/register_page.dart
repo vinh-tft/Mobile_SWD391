@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'login_page.dart';
 import '../services/auth_service.dart';
+import '../services/api_client.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -16,10 +17,25 @@ class _RegisterPageState extends State<RegisterPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _dobController = TextEditingController();
+  final _streetController = TextEditingController();
+  final _wardController = TextEditingController();
+  final _districtController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _provinceController = TextEditingController();
+  final _postalCodeController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
   bool _agreeToTerms = false;
+  bool _agreeToPrivacy = false;
+  bool _marketingConsent = false;
+  String? _gender;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -27,6 +43,17 @@ class _RegisterPageState extends State<RegisterPage> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _usernameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _phoneController.dispose();
+    _dobController.dispose();
+    _streetController.dispose();
+    _wardController.dispose();
+    _districtController.dispose();
+    _cityController.dispose();
+    _provinceController.dispose();
+    _postalCodeController.dispose();
     super.dispose();
   }
 
@@ -116,6 +143,94 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget _buildRegisterForm() {
     return Column(
       children: [
+        // Username
+        TextFormField(
+          controller: _usernameController,
+          decoration: InputDecoration(
+            labelText: 'Tên người dùng',
+            hintText: 'Nhập username',
+            prefixIcon: const Icon(Icons.alternate_email, color: Color(0xFF22C55E)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Vui lòng nhập username';
+            }
+            return null;
+          },
+        ),
+
+        const SizedBox(height: 16),
+
+        // First name
+        TextFormField(
+          controller: _firstNameController,
+          decoration: InputDecoration(
+            labelText: 'Tên',
+            hintText: 'Nhập tên',
+            prefixIcon: const Icon(Icons.badge_outlined, color: Color(0xFF22C55E)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Vui lòng nhập tên';
+            }
+            return null;
+          },
+        ),
+
+        const SizedBox(height: 16),
+
+        // Last name
+        TextFormField(
+          controller: _lastNameController,
+          decoration: InputDecoration(
+            labelText: 'Họ và tên đệm',
+            hintText: 'Nhập họ và tên đệm',
+            prefixIcon: const Icon(Icons.perm_identity, color: Color(0xFF22C55E)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+          ),
+        ),
+
         // Họ tên
         TextFormField(
           controller: _nameController,
@@ -149,6 +264,103 @@ class _RegisterPageState extends State<RegisterPage> {
           },
         ),
         
+        const SizedBox(height: 16),
+
+        // Phone
+        TextFormField(
+          controller: _phoneController,
+          keyboardType: TextInputType.phone,
+          decoration: InputDecoration(
+            labelText: 'Số điện thoại',
+            hintText: 'Nhập số điện thoại',
+            prefixIcon: const Icon(Icons.phone_outlined, color: Color(0xFF22C55E)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Date of birth
+        TextFormField(
+          controller: _dobController,
+          readOnly: true,
+          decoration: InputDecoration(
+            labelText: 'Ngày sinh',
+            hintText: 'Chọn ngày sinh',
+            prefixIcon: const Icon(Icons.cake_outlined, color: Color(0xFF22C55E)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+          ),
+          onTap: () async {
+            final now = DateTime.now();
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: DateTime(now.year - 18, now.month, now.day),
+              firstDate: DateTime(1900),
+              lastDate: now,
+            );
+            if (picked != null) {
+              _dobController.text = '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+            }
+          },
+        ),
+
+        const SizedBox(height: 16),
+
+        // Gender
+        DropdownButtonFormField<String>(
+          value: _gender,
+          items: const [
+            DropdownMenuItem(value: 'MALE', child: Text('Nam')),
+            DropdownMenuItem(value: 'FEMALE', child: Text('Nữ')),
+            DropdownMenuItem(value: 'OTHER', child: Text('Khác')),
+          ],
+          decoration: InputDecoration(
+            labelText: 'Giới tính',
+            prefixIcon: const Icon(Icons.wc, color: Color(0xFF22C55E)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+          ),
+          onChanged: (v) => setState(() => _gender = v),
+        ),
+
         const SizedBox(height: 16),
         
         // Email
@@ -278,38 +490,80 @@ class _RegisterPageState extends State<RegisterPage> {
             return null;
           },
         ),
+
+        const SizedBox(height: 8),
+        if (_errorMessage != null && _errorMessage!.isNotEmpty)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _errorMessage!,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
       ],
     );
   }
 
   Widget _buildTermsCheckbox() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
       children: [
-        Checkbox(
-          value: _agreeToTerms,
-          onChanged: (value) {
-            setState(() {
-              _agreeToTerms = value ?? false;
-            });
-          },
-          activeColor: const Color(0xFF22C55E),
-        ),
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _agreeToTerms = !_agreeToTerms;
-              });
-            },
-            child: const Text(
-              'Tôi đồng ý với Điều khoản sử dụng và Chính sách bảo mật',
-              style: TextStyle(
-                color: Color(0xFF6B7280),
-                fontSize: 14,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Checkbox(
+              value: _agreeToTerms,
+              onChanged: (value) {
+                setState(() {
+                  _agreeToTerms = value ?? false;
+                });
+              },
+              activeColor: const Color(0xFF22C55E),
+            ),
+            const Expanded(
+              child: Text(
+                'Tôi đồng ý với Điều khoản sử dụng',
+                style: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
               ),
             ),
-          ),
+          ],
+        ),
+        Row(
+          children: [
+            Checkbox(
+              value: _agreeToPrivacy,
+              onChanged: (value) {
+                setState(() {
+                  _agreeToPrivacy = value ?? false;
+                });
+              },
+              activeColor: const Color(0xFF22C55E),
+            ),
+            const Expanded(
+              child: Text(
+                'Tôi đồng ý với Chính sách bảo mật',
+                style: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Checkbox(
+              value: _marketingConsent,
+              onChanged: (value) {
+                setState(() {
+                  _marketingConsent = value ?? false;
+                });
+              },
+              activeColor: const Color(0xFF22C55E),
+            ),
+            const Expanded(
+              child: Text(
+                'Tôi đồng ý nhận thông tin khuyến mãi',
+                style: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -398,21 +652,67 @@ class _RegisterPageState extends State<RegisterPage> {
     
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
-    // Thực hiện đăng ký
-    final success = await authService.register(
-      _nameController.text,
-      _emailController.text,
-      _passwordController.text,
-      '0123456789', // Số điện thoại mặc định cho demo
-    );
+    // Thực hiện đăng ký đầy đủ
+    final name = _nameController.text.trim();
+    final parts = name.split(RegExp(r"\s+"));
+    final first = _firstNameController.text.isNotEmpty ? _firstNameController.text : (parts.isNotEmpty ? parts.first : '');
+    final last = _lastNameController.text.isNotEmpty ? _lastNameController.text : (parts.length > 1 ? parts.sublist(1).join(' ') : '');
+    final username = _usernameController.text.isNotEmpty ? _usernameController.text : _emailController.text.split('@').first;
+
+    bool success = false;
+    try {
+      success = await authService.registerFull(
+        email: _emailController.text,
+        password: _passwordController.text,
+        username: username,
+        firstName: first,
+        lastName: last,
+        phone: _phoneController.text.isNotEmpty ? _phoneController.text : '0000000000',
+        dateOfBirth: _dobController.text.isNotEmpty ? _dobController.text : null,
+        gender: _gender,
+        streetAddress: _streetController.text.isNotEmpty ? _streetController.text : null,
+        ward: _wardController.text.isNotEmpty ? _wardController.text : null,
+        district: _districtController.text.isNotEmpty ? _districtController.text : null,
+        city: _cityController.text.isNotEmpty ? _cityController.text : null,
+        province: _provinceController.text.isNotEmpty ? _provinceController.text : null,
+        postalCode: _postalCodeController.text.isNotEmpty ? _postalCodeController.text : null,
+        acceptTerms: _agreeToTerms,
+        acceptPrivacy: _agreeToPrivacy,
+        marketingConsent: _marketingConsent,
+      );
+    } catch (e) {
+      success = false;
+      String msg = e.toString();
+      if (e is ApiException) {
+        msg = e.body;
+      }
+      // Normalize common validation/error patterns
+      final prefixRegex = RegExp(r'^(registration failed:|validation failed:|error:)\s*', caseSensitive: false);
+      msg = msg.replaceAll(prefixRegex, '').trimLeft();
+      // If backend returns multiple messages joined by |, keep as-is for clarity
+      setState(() {
+        _errorMessage = msg;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Colors.red),
+      );
+      setState(() {
+        _isLoading = false;
+      });
+      return; // tránh hiển thị snackbar lỗi chung phía dưới
+    }
 
     setState(() {
       _isLoading = false;
     });
 
     if (success) {
+      setState(() {
+        _errorMessage = null;
+      });
       // Hiển thị thông báo thành công
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -425,14 +725,6 @@ class _RegisterPageState extends State<RegisterPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
-    } else {
-      // Hiển thị thông báo lỗi
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đăng ký thất bại. Vui lòng thử lại'),
-          backgroundColor: Colors.red,
-        ),
       );
     }
   }

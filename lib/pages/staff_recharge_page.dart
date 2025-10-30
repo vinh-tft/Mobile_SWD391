@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/clothing_service.dart';
+import '../services/users_service.dart';
+import '../services/points_service.dart';
 
 class StaffRechargePage extends StatefulWidget {
   const StaffRechargePage({super.key});
@@ -654,19 +656,42 @@ class _StaffRechargePageState extends State<StaffRechargePage> {
       _isLoading = true;
     });
 
-    // Giả lập nạp điểm (trong thực tế sẽ gọi API)
-    await Future.delayed(const Duration(seconds: 2));
+    // Gọi API: tìm user theo email, sau đó adjust points
+    final usersService = Provider.of<UsersService>(context, listen: false);
+    final pointsService = Provider.of<PointsService>(context, listen: false);
 
-    setState(() {
-      _isLoading = false;
-    });
+    // Lấy email từ customer selected (mock list)
+    final selected = _customers.firstWhere((c) => c['id'] == _selectedCustomerId);
+    final email = selected['email'] as String;
+    final user = await usersService.getByEmail(email);
 
-    // Cập nhật điểm cho khách hàng trong danh sách
-    final customerIndex = _customers.indexWhere(
-      (c) => c['id'] == _selectedCustomerId,
+    if (user == null || user['id'] == null) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không tìm thấy người dùng trên hệ thống'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final ok = await pointsService.adjustPoints(
+      userId: user['id'].toString(),
+      amount: amount,
+      reason: 'staff_recharge_${_selectedPaymentMethod ?? 'unknown'}',
     );
-    if (customerIndex != -1) {
-      _customers[customerIndex]['points'] += amount;
+
+    setState(() => _isLoading = false);
+
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nạp điểm thất bại'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
     }
 
     ScaffoldMessenger.of(context).showSnackBar(

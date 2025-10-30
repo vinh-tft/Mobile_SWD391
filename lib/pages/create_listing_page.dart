@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/sales_service.dart';
+import '../models/api_models.dart';
 
 class CreateListingPage extends StatefulWidget {
   const CreateListingPage({super.key});
@@ -9,23 +12,19 @@ class CreateListingPage extends StatefulWidget {
 
 class _CreateListingPageState extends State<CreateListingPage> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _priceController = TextEditingController();
+  final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
-  String _condition = 'Like New';
-  String _size = 'M';
-  String _category = 'Clothing';
-  bool _isSubmitting = false;
+  final _quantityController = TextEditingController(text: '1');
+  final _priceController = TextEditingController(text: '0');
 
-  final List<String> _conditions = ['New', 'Like New', 'Good', 'Fair'];
-  final List<String> _sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-  final List<String> _categories = ['Clothing'];
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _priceController.dispose();
+    _nameController.dispose();
     _descriptionController.dispose();
+    _quantityController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 
@@ -47,40 +46,59 @@ class _CreateListingPageState extends State<CreateListingPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildTextField(
-                  controller: _titleController,
-                  label: 'Tiêu đề',
-                  hint: 'Ví dụ: Áo khoác denim vintage',
-                  icon: Icons.title,
-                  validator: (v) => (v == null || v.isEmpty) ? 'Vui lòng nhập tiêu đề' : null,
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Tên sản phẩm *',
+                    hintText: 'Ví dụ: Áo khoác denim vintage',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.title, color: Color(0xFF22C55E)),
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Vui lòng nhập tên sản phẩm' : null,
                 ),
                 const SizedBox(height: 16),
-                _buildTextField(
-                  controller: _priceController,
-                  label: 'Giá bán',
-                  hint: 'Ví dụ: 1.050.000 VND',
-                  icon: Icons.attach_money,
-                  keyboardType: TextInputType.number,
-                  validator: (v) => (v == null || v.isEmpty) ? 'Vui lòng nhập giá' : null,
-                ),
-                const SizedBox(height: 16),
-                _buildDropdown('Tình trạng', _conditions, _condition, (val) {
-                  setState(() => _condition = val);
-                }),
-                const SizedBox(height: 16),
-                _buildDropdown('Kích cỡ', _sizes, _size, (val) {
-                  setState(() => _size = val);
-                }),
-                const SizedBox(height: 16),
-                _buildDropdown('Danh mục', _categories, _category, (val) {
-                  setState(() => _category = val);
-                }),
-                const SizedBox(height: 16),
-                _buildMultilineField(
+                TextFormField(
                   controller: _descriptionController,
-                  label: 'Mô tả',
-                  hint: 'Mô tả chi tiết về sản phẩm của bạn...',
-                  icon: Icons.description,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Mô tả',
+                    hintText: 'Mô tả chi tiết về sản phẩm...',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.description, color: Color(0xFF22C55E)),
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Vui lòng nhập mô tả' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _quantityController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Số lượng *',
+                    hintText: 'Ví dụ: 1',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.format_list_numbered, color: Color(0xFF22C55E)),
+                  ),
+                  validator: (v) {
+                    final n = int.tryParse(v ?? '');
+                    if (n == null || n <= 0) return 'Số lượng phải > 0';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _priceController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Giá (VND) *',
+                    hintText: 'Ví dụ: 100000',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.attach_money, color: Color(0xFF22C55E)),
+                  ),
+                  validator: (v) {
+                    final n = int.tryParse(v ?? '');
+                    if (n == null || n < 0) return 'Giá phải >= 0';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
@@ -99,7 +117,7 @@ class _CreateListingPageState extends State<CreateListingPage> {
                             height: 22,
                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                           )
-                        : const Text('Đăng bài', style: TextStyle(fontWeight: FontWeight.w600)),
+                        : const Text('Đăng sản phẩm', style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],
@@ -110,113 +128,51 @@ class _CreateListingPageState extends State<CreateListingPage> {
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, color: const Color(0xFF22C55E)),
-        filled: true,
-        fillColor: const Color(0xFFF9FAFB),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
-        ),
-      ),
-      validator: validator,
-    );
-  }
-
-  Widget _buildMultilineField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-  }) {
-    return TextFormField(
-      controller: controller,
-      maxLines: 5,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        alignLabelWithHint: true,
-        prefixIcon: Icon(icon, color: const Color(0xFF22C55E)),
-        filled: true,
-        fillColor: const Color(0xFFF9FAFB),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
-        ),
-      ),
-      validator: (v) => (v == null || v.isEmpty) ? 'Vui lòng nhập mô tả' : null,
-    );
-  }
-
-  Widget _buildDropdown(String label, List<String> items, String value, void Function(String) onChanged) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: const Color(0xFFF9FAFB),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
-        ),
-      ),
-      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-      onChanged: (v) {
-        if (v != null) onChanged(v);
-      },
-    );
-  }
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() => _isSubmitting = false);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Đăng sản phẩm thành công!'),
-        backgroundColor: Color(0xFF22C55E),
-      ),
-    );
-    Navigator.pop(context);
+    try {
+      final salesService = context.read<SalesService>();
+      final name = (_nameController.text).trim();
+      final description = (_descriptionController.text).trim();
+      final quantityStr = (_quantityController.text).trim();
+      final priceStr = (_priceController.text).trim();
+      final quantity = int.tryParse(quantityStr);
+      final price = int.tryParse(priceStr);
+
+      if (name.isEmpty || description.isEmpty || quantity == null || quantity <= 0 || price == null || price < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vui lòng nhập dữ liệu hợp lệ')), 
+        );
+        return;
+      }
+
+      final req = SaleCreateRequest(
+        name: name,
+        description: description,
+        quantity: quantity,
+        price: price,
+      );
+      final ok = await salesService.createSaleItem(req);
+      if (!mounted) return;
+      if (ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đăng sản phẩm thành công!'), backgroundColor: Color(0xFF22C55E)),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(salesService.error ?? 'Không thể đăng sản phẩm!'), backgroundColor: const Color(0xFFEF4444)),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: $e'), backgroundColor: const Color(0xFFEF4444)),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 }
 

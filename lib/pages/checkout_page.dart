@@ -1,4 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
+import '../services/points_service.dart';
+import '../services/items_service.dart';
+import '../services/clothing_service.dart';
+import '../models/transaction.dart';
+import '../models/api_models.dart';
 
 class CheckoutPage extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -100,6 +107,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
     _cityController.text = 'Hồ Chí Minh';
     _districtController.text = 'Quận 1';
     _wardController.text = 'Phường Bến Nghé';
+
+    // Rebuild when users edit to refresh the enabled state of the Continue button
+    void addListener(TextEditingController c) => c.addListener(() => setState(() {}));
+    addListener(_nameController);
+    addListener(_phoneController);
+    addListener(_addressController);
+    addListener(_cityController);
+    addListener(_districtController);
+    addListener(_wardController);
+    addListener(_noteController);
   }
 
   @override
@@ -1047,57 +1064,94 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
   }
 
-  void _placeOrder() {
-    // Show loading dialog
+  void _placeOrder() async {
+    // Lấy context provider
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final pointsService = Provider.of<PointsService>(context, listen: false);
+    final itemsService = Provider.of<ItemsService>(context, listen: false);
+    final clothingService = Provider.of<ClothingService>(context, listen: false);
+    final user = authService.currentUser;
+    
+    final productPrice = int.tryParse(widget.product['price']?.replaceAll(RegExp(r'[^0-9]'), '') ?? '') ?? 0;
+    // Lấy itemId từ props truyền vào product (nên sửa source từ marketplace truyền cả itemId sang)
+    final String? itemId = widget.product['itemId'] ?? null;
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Không tìm thấy thông tin người dùng'), backgroundColor: Colors.red));
+      return;
+    }
+    if (user.points < productPrice) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Bạn không đủ điểm để mua sản phẩm này!'), backgroundColor: Colors.red));
+      return;
+    }
+    if (itemId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Thiếu mã sản phẩm!'), backgroundColor: Colors.red));
+      return;
+    }
+    
+    // Show loading
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF22C55E)),
-        ),
+        child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF22C55E))),
       ),
     );
-
-    // Simulate order processing
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pop(context); // Close loading dialog
-      
-      // Show success dialog
+    try {
+      // Trừ điểm user (API, backend sẽ lưu lịch sử transaction thực)
+      final pointSuccess = await pointsService.adjustPoints(userId: user.id, amount: -productPrice, reason: 'buy_item');
+      if (!pointSuccess) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Giao dịch thất bại khi trừ điểm!'), backgroundColor: Colors.red));
+        return;
+      }
+      // Đánh dấu item SOLD (API)
+      final soldSuccess = await itemsService.updateItemStatus(itemId, ItemStatus.SOLD);
+      if (!soldSuccess) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Không thể cập nhật trạng thái sản phẩm!'), backgroundColor: Colors.red));
+        return;
+      }
+      // Lưu transaction local (nếu muốn demo) hoặc backend sẽ có
+      clothingService.createTransaction(Transaction(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        customerId: user.id,
+        staffId: null,
+        type: TransactionType.buy,
+        status: TransactionStatus.completed,
+        clothingItemIds: [itemId],
+        totalPoints: productPrice,
+        notes: 'Khách mua hàng',
+        createdAt: DateTime.now(),
+        completedAt: DateTime.now(),
+      ));
+      // Đặt hàng thành công
+      Navigator.pop(context); // Close loading
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: const Row(
             children: [
-              Icon(
-                Icons.check_circle,
-                color: Color(0xFF22C55E),
-                size: 32,
-              ),
+              Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 32),
               SizedBox(width: 12),
               Text('Đặt hàng thành công!'),
             ],
           ),
-          content: const Text(
-            'Đơn hàng của bạn đã được xác nhận. Chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất.',
-          ),
+          content: const Text('Đơn hàng của bạn đã được xác nhận. Chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất.'),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Close dialog
                 Navigator.pop(context); // Go back to marketplace
               },
-              child: const Text(
-                'OK',
-                style: TextStyle(
-                  color: Color(0xFF22C55E),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: const Text('OK', style: TextStyle(color: Color(0xFF22C55E), fontWeight: FontWeight.bold)),
             ),
           ],
         ),
       );
-    });
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red));
+    }
   }
 }

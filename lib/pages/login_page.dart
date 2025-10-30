@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'register_page.dart';
 import '../services/auth_service.dart';
+import '../services/api_client.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -16,6 +17,7 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -196,6 +198,16 @@ class _LoginPageState extends State<LoginPage> {
             return null;
           },
         ),
+
+        const SizedBox(height: 8),
+        if (_errorMessage != null && _errorMessage!.isNotEmpty)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _errorMessage!,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
       ],
     );
   }
@@ -298,36 +310,78 @@ class _LoginPageState extends State<LoginPage> {
     
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
-    // Thực hiện đăng nhập
-    final success = await authService.login(
-      _emailController.text,
-      _passwordController.text,
-    );
+    bool success = false;
+    try {
+      success = await authService.login(
+        _emailController.text,
+        _passwordController.text,
+      );
+    } catch (e) {
+      String msg = e.toString();
+      if (e is ApiException) {
+        msg = e.body;
+      }
+      // UI-level normalization as a safeguard in case backend messages change
+      final prefixRegex = RegExp(r'^(login failed:\s*)+', caseSensitive: false);
+      msg = msg.replaceFirst(prefixRegex, '').trimLeft();
+      if (RegExp('bad credentials', caseSensitive: false).hasMatch(msg)) {
+        msg = 'Email hoặc mật khẩu không đúng';
+      }
+      setState(() {
+        _errorMessage = msg;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Colors.red),
+      );
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = false;
     });
 
     if (success) {
-      // Hiển thị thông báo thành công
+      setState(() {
+        _errorMessage = null;
+      });
+      
+      // Lấy thông tin user để check role
+      final currentUser = authService.currentUser;
+      String roleMessage = 'Đăng nhập thành công!';
+      
+      if (currentUser != null) {
+        if (currentUser.role == UserRole.staff) {
+          roleMessage = 'Chào mừng nhân viên ${currentUser.name}!';
+        } else {
+          roleMessage = 'Chào mừng khách hàng ${currentUser.name}!';
+        }
+      }
+      
+      // Hiển thị thông báo thành công với role
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đăng nhập thành công!'),
-          backgroundColor: Color(0xFF22C55E),
+        SnackBar(
+          content: Text(roleMessage),
+          backgroundColor: const Color(0xFF22C55E),
         ),
       );
-      // Đóng màn hình đăng nhập (nếu đang ở trên stack) để về trang Home
-      // Consumer ở GreenLoopHomePage sẽ tự hiển thị trang chính sau khi đăng nhập
-      Future.microtask(() {
-        Navigator.of(context).maybePop();
-      });
+      
+      // App sẽ tự động redirect sau khi login thành công
+      // Không cần Navigator.pop() vì authentication guard sẽ handle
     } else {
       // Hiển thị thông báo lỗi
+      final fallback = 'Email hoặc mật khẩu không đúng';
+      setState(() {
+        _errorMessage = _errorMessage ?? fallback;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Email hoặc mật khẩu không đúng'),
+        SnackBar(
+          content: Text(_errorMessage ?? fallback),
           backgroundColor: Colors.red,
         ),
       );

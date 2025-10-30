@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/clothing_service.dart';
+import '../models/transaction.dart'; // Thêm dòng này vào đầu file
 
 class TransactionsPage extends StatefulWidget {
   const TransactionsPage({super.key});
@@ -88,60 +89,52 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 
   Widget _buildTransactionsList(ClothingService clothingService) {
-    // Mock data for transactions
-    final transactions = [
-      {
-        'id': 'T001',
-        'type': 'purchase',
-        'customerName': 'Nguyễn Văn A',
-        'itemName': 'Áo khoác denim',
-        'points': 800,
-        'date': DateTime.now().subtract(const Duration(hours: 2)),
-        'status': 'completed',
-      },
-      {
-        'id': 'T002',
-        'type': 'sale',
-        'customerName': 'Trần Thị B',
-        'itemName': 'Quần jean',
-        'points': 600,
-        'date': DateTime.now().subtract(const Duration(hours: 5)),
-        'status': 'completed',
-      },
-      {
-        'id': 'T003',
-        'type': 'exchange',
-        'customerName': 'Lê Văn C',
-        'itemName': 'Váy hoa',
-        'points': 500,
-        'date': DateTime.now().subtract(const Duration(days: 1)),
-        'status': 'pending',
-      },
-      {
-        'id': 'T004',
-        'type': 'purchase',
-        'customerName': 'Phạm Thị D',
-        'itemName': 'Giày sneakers',
-        'points': 1200,
-        'date': DateTime.now().subtract(const Duration(days: 2)),
-        'status': 'completed',
-      },
-    ];
-
-    final filteredTransactions = _selectedFilter == 'all'
-        ? transactions
-        : transactions.where((t) => t['type'] == _selectedFilter).toList();
-
-    if (filteredTransactions.isEmpty) {
+    final transactions = clothingService.transactions;
+    if (transactions.isEmpty) {
       return _buildEmptyState();
     }
 
+    // Lọc theo tab chọn
+    final filtered = _selectedFilter == 'all'
+        ? transactions
+        : transactions.where((t) {
+            switch (_selectedFilter) {
+              case 'purchase':
+                return t.type == TransactionType.buy;
+              case 'sale':
+                return t.type == TransactionType.sell;
+              case 'exchange':
+                return t.type == TransactionType.exchange;
+              default:
+                return true;
+            }
+          }).toList();
+
+    if (filtered.isEmpty) return _buildEmptyState();
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: filteredTransactions.length,
-      itemBuilder: (context, index) {
-        final transaction = filteredTransactions[index];
-        return _buildTransactionCard(transaction);
+      itemCount: filtered.length,
+      itemBuilder: (context, idx) {
+        final txn = filtered[idx];
+        // Lấy tên sản phẩm đầu tiên (nếu có)
+        String? itemName;
+        if (txn.clothingItemIds.isNotEmpty) {
+          final allClothes = clothingService.clothingItems;
+          final found = allClothes.where((it) => it.id == txn.clothingItemIds.first).toList();
+          if (found.isNotEmpty) {
+            itemName = found.first.name;
+          }
+        }
+        return _buildTransactionCard({
+          'id': txn.id,
+          'type': txn.type.toString().split('.').last,
+          'customerName': txn.customerId,
+          'itemName': itemName ?? 'Sản phẩm',
+          'points': txn.totalPoints,
+          'date': txn.createdAt,
+          'status': txn.status.toString().split('.').last,
+        });
       },
     );
   }
