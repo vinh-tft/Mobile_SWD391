@@ -95,6 +95,7 @@ class AuthService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isCustomer => _currentUser?.role == UserRole.customer;
   bool get isStaff => _currentUser?.role == UserRole.staff;
+  bool get isAdmin => _currentUser?.role == UserRole.staff; // Staff has admin privileges
   Future<void> restoreSession() async {
     if (_api == null) return;
     final prefs = await SharedPreferences.getInstance();
@@ -122,21 +123,32 @@ class AuthService extends ChangeNotifier {
           final roleFromRole = me['role']?.toString().toLowerCase();
           final roleFromUserType = me['userType']?.toString().toLowerCase();
           print('🔍 RestoreSession - role field: ${me['role']} (type: ${me['role'].runtimeType})');
-          print('🔍 RestoreSession - userType field: ${me['userType']} (type: ${me['userType'].runtimeType})');
-          final roleStr = roleFromRole ?? roleFromUserType ?? 'customer';
-          print('🔍 RestoreSession - Final role: $roleStr');
-          final isStaff = roleStr == 'staff' || roleStr == 'admin';
-          print('🔍 RestoreSession - Is staff: $isStaff');
-          return isStaff ? UserRole.staff : UserRole.customer;
+            print('🔍 RestoreSession - userType field: ${me['userType']} (type: ${me['userType'].runtimeType})');
+            final roleStr = (roleFromRole ?? roleFromUserType ?? 'CUSTOMER').toUpperCase();
+            print('🔍 RestoreSession - Final role (uppercase): $roleStr');
+            // ADMIN and STAFF both map to UserRole.staff
+            final isStaff = roleStr == 'STAFF' || roleStr == 'ADMIN';
+            print('🔍 RestoreSession - Is staff/admin: $isStaff');
+            return isStaff ? UserRole.staff : UserRole.customer;
+          }(),
+        points: () {
+          final pointsValue = me['points'] ?? me['sustainabilityPoints'] ?? 0;
+          print('🔍 RestoreSession - Points from API: $pointsValue (type: ${pointsValue.runtimeType})');
+          final parsedPoints = pointsValue is int
+              ? pointsValue
+              : int.tryParse(pointsValue.toString()) ?? 0;
+          print('🔍 RestoreSession - Parsed points: $parsedPoints');
+          return parsedPoints;
         }(),
-        points: (me['points'] ?? me['sustainabilityPoints'] ?? 0) is int
-            ? (me['points'] ?? me['sustainabilityPoints'] ?? 0)
-            : int.tryParse((me['points'] ?? me['sustainabilityPoints'] ?? '0').toString()) ?? 0,
         staffId: me['staffId']?.toString(),
         storeName: me['storeName']?.toString(),
         storeAddress: me['storeAddress']?.toString(),
       );
       _currentUser = user;
+      
+      // Fetch real points from database after restoring session
+      await refreshPoints();
+      
       notifyListeners();
     } catch (_) {
       // invalid token → clear
@@ -222,25 +234,43 @@ class AuthService extends ChangeNotifier {
           role: () {
             print('🔍 Login - Using extracted me object: $me');
             print('🔍 Login - me keys: ${me.keys.toList()}');
-            final roleFromRole = me['role']?.toString().toLowerCase();
-            final roleFromUserType = me['userType']?.toString().toLowerCase();
+            final roleFromRole = me['role']?.toString().toUpperCase();
+            final roleFromUserType = me['userType']?.toString().toUpperCase();
             print('🔍 Login - role field: ${me['role']} (type: ${me['role'].runtimeType})');
             print('🔍 Login - userType field: ${me['userType']} (type: ${me['userType'].runtimeType})');
-            final roleStr = roleFromRole ?? roleFromUserType ?? 'customer';
-            print('🔍 Login - Final role: $roleStr');
-            final isStaff = roleStr == 'staff' || roleStr == 'admin';
-            print('🔍 Login - Is staff: $isStaff');
+            final roleStr = roleFromRole ?? roleFromUserType ?? 'CUSTOMER';
+            print('🔍 Login - Final role (uppercase): $roleStr');
+            // ADMIN and STAFF both map to UserRole.staff (for admin privileges)
+            final isStaff = roleStr == 'STAFF' || roleStr == 'ADMIN';
+            print('🔍 Login - Is staff/admin: $isStaff (will use staff role)');
             return isStaff ? UserRole.staff : UserRole.customer;
           }(),
-          points: (me['points'] ?? me['sustainabilityPoints'] ?? 0) is int
-              ? (me['points'] ?? me['sustainabilityPoints'] ?? 0)
-              : int.tryParse((me['points'] ?? me['sustainabilityPoints'] ?? '0').toString()) ?? 0,
+          points: () {
+            print('🔍 ========== PARSING POINTS ==========');
+            print('🔍 Full me object keys: ${me.keys}');
+            print('🔍 me["points"] = ${me['points']}');
+            print('🔍 me["sustainabilityPoints"] = ${me['sustainabilityPoints']}');
+            
+            final pointsValue = me['sustainabilityPoints'] ?? me['points'] ?? 0;
+            print('🔍 Selected points value: $pointsValue (type: ${pointsValue.runtimeType})');
+            
+            final parsedPoints = pointsValue is int
+                ? pointsValue
+                : int.tryParse(pointsValue.toString()) ?? 0;
+            print('🔍 Final parsed points: $parsedPoints');
+            print('🔍 =====================================');
+            return parsedPoints;
+          }(),
           staffId: me['staffId']?.toString(),
           storeName: me['storeName']?.toString(),
           storeAddress: me['storeAddress']?.toString(),
         );
 
         _currentUser = user;
+        
+        // Fetch real points from database after login
+        await refreshPoints();
+        
         _isLoading = false;
         notifyListeners();
         return true;
@@ -392,6 +422,104 @@ class AuthService extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       rethrow;
+    }
+  }
+
+  // Refresh points from API - using dedicated points endpoint like frontend
+  Future<void> refreshPoints() async {
+    if (_currentUser == null || _api == null) {
+      print('⚠️ Cannot refresh points: currentUser=${_currentUser != null}, api=${_api != null}');
+      return;
+    }
+    
+    try {
+      print('🔍 Refreshing points from dedicated API endpoint...');
+      print('🔍 User ID: ${_currentUser!.id}');
+      print('🔍 Calling: /api/points/${_currentUser!.id}/available');
+      
+      // Use the same endpoint as frontend: /api/points/{userId}/available
+      final pointsResponse = await _api!.get('/api/points/${_currentUser!.id}/available');
+      print('🔍 Refresh Points - Raw response: $pointsResponse');
+      print('🔍 Refresh Points - Response type: ${pointsResponse.runtimeType}');
+      
+      // Extract points EXACTLY like frontend: response.data.data ?? response.data ?? 0
+      // Frontend code: const points = response.data.data ?? response.data ?? 0;
+      dynamic pointsValue;
+      
+      if (pointsResponse is Map) {
+        print('🔍 Response is Map with keys: ${pointsResponse.keys.toList()}');
+        
+        // First try response.data.data (nested data field like frontend)
+        if (pointsResponse.containsKey('data')) {
+          final dataField = pointsResponse['data'];
+          if (dataField is Map && dataField.containsKey('data')) {
+            // Nested data structure: { data: { data: <points> } }
+            pointsValue = dataField['data'];
+            print('🔍 Found nested data.data field: $pointsValue');
+          } else if (dataField is int || dataField is double) {
+            // Direct data field: { data: <points> }
+            pointsValue = dataField;
+            print('🔍 Found direct data field: $pointsValue');
+          } else {
+            // Try response.data itself
+            pointsValue = dataField;
+            print('🔍 Using data field as-is: $pointsValue');
+          }
+        } else {
+          // Fallback: use entire response (shouldn't happen with proper API)
+          pointsValue = pointsResponse;
+          print('🔍 No data field, using entire response: $pointsValue');
+        }
+      } else if (pointsResponse is int || pointsResponse is double) {
+        // Direct numeric response
+        pointsValue = pointsResponse;
+        print('🔍 Direct numeric response: $pointsValue');
+      } else {
+        pointsValue = 0;
+        print('⚠️ Unexpected response format, defaulting to 0');
+      }
+      
+      print('🔍 Refresh Points - Points value: $pointsValue (type: ${pointsValue.runtimeType})');
+      
+      final parsedPoints = pointsValue is int
+          ? pointsValue
+          : (pointsValue is double
+              ? pointsValue.toInt()
+              : int.tryParse(pointsValue.toString()) ?? 0);
+      
+      print('✅ Refresh Points - Successfully loaded: $parsedPoints points');
+      print('🔍 Current user points before update: ${_currentUser!.points}');
+      
+      updatePoints(parsedPoints);
+      
+      print('🔍 Current user points after update: ${_currentUser!.points}');
+    } catch (e, stackTrace) {
+      print('❌ Refresh Points - Error: $e');
+      print('❌ Stack trace: $stackTrace');
+      
+      // Fallback: try to get from /api/auth/me
+      try {
+        print('🔄 Trying fallback method from /api/auth/me...');
+        final meResponse = await _api!.get('/api/auth/me');
+        print('🔄 Fallback response: $meResponse');
+        
+        final me = meResponse is Map && meResponse['data'] != null 
+            ? meResponse['data'] 
+            : meResponse;
+        
+        final pointsValue = me['sustainabilityPoints'] ?? me['points'] ?? 0;
+        print('🔄 Fallback points value: $pointsValue');
+        
+        final parsedPoints = pointsValue is int
+            ? pointsValue
+            : int.tryParse(pointsValue.toString()) ?? 0;
+        
+        updatePoints(parsedPoints);
+        print('✅ Fallback method successful: $parsedPoints points');
+      } catch (fallbackError, fallbackStack) {
+        print('❌ Fallback also failed: $fallbackError');
+        print('❌ Fallback stack: $fallbackStack');
+      }
     }
   }
 

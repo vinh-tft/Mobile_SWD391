@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/clothing_service.dart';
+import '../theme/app_colors.dart';
 import 'marketplace_page.dart';
 import 'profile_page.dart';
 import 'recharge_page.dart';
@@ -24,7 +25,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
     
@@ -37,7 +38,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     ));
     
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
+      begin: const Offset(0, 0.2),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _animationController,
@@ -57,37 +58,35 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Consumer2<AuthService, ClothingService>(
       builder: (context, authService, clothingService, child) {
-        return SingleChildScrollView(
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: SlideTransition(
-              position: _slideAnimation,
-              child: Column(
-                children: [
-                  // Header Section
-                  _buildHeader(authService),
-                  
-                  // Hero Section
-                  _buildHeroSection(authService),
-                  
-                  // Quick Actions
-                  _buildQuickActions(authService),
-                  
-                  // Statistics Section
-                  _buildStatistics(),
-                  
-                  // Feature Cards Section
-                  _buildFeatureCards(authService),
-                  
-                  // Why Choose Section
-                  _buildWhyChooseSection(),
-                  
-                  // Bottom Feature Cards
-                  _buildBottomFeatureCards(),
-                  
-                  // Newsletter Section
-                  _buildNewsletterSection(),
-                ],
+        return Container(
+          color: AppColors.background,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: Column(
+                  children: [
+                    // Header Section
+                    _buildHeader(authService),
+                    
+                    // Hero Section with gradient
+                    _buildHeroSection(authService),
+                    
+                    // Quick Actions
+                    _buildQuickActions(authService),
+                    
+                    // Statistics Section
+                    _buildStatistics(),
+                    
+                    // Feature Cards Section
+                    _buildFeatureCards(authService),
+                    
+                    // Bottom spacing
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
           ),
@@ -99,6 +98,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget _buildHeader(AuthService authService) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.border,
+            width: 1,
+          ),
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -107,11 +115,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             child: Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF22C55E),
-                    borderRadius: BorderRadius.circular(6),
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
                     Icons.recycling,
@@ -119,14 +127,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     size: 20,
                   ),
                 ),
-                const SizedBox(width: 8),
-                const Flexible(
+                const SizedBox(width: 10),
+                Flexible(
                   child: Text(
                     'Green Loop',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
+                      color: AppColors.foreground,
+                      letterSpacing: -0.5,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -137,37 +146,62 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           // User info
           Row(
             children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF22C55E).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.stars,
-                          color: Color(0xFF22C55E),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${authService.currentUser?.points ?? 0} điểm',
-                          style: const TextStyle(
-                            color: Color(0xFF22C55E),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.accent,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AppColors.primary.withOpacity(0.2),
+                    width: 1,
                   ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.stars_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${authService.currentUser?.points ?? 0}',
+                      style: TextStyle(
+                        color: AppColors.accentForeground,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(width: 8),
-              const Icon(
-                Icons.notifications_outlined,
-                color: Color(0xFF6B7280),
-                size: 24,
+              // Refresh points button
+              Consumer<AuthService>(
+                builder: (context, authService, _) {
+                  return IconButton(
+                    icon: Icon(
+                      Icons.refresh_rounded,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
+                    onPressed: () async {
+                      await authService.refreshPoints();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Đã cập nhật: ${authService.currentUser?.points ?? 0} điểm'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: AppColors.primary,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                    tooltip: 'Làm mới điểm',
+                  );
+                },
               ),
             ],
           ),
@@ -178,37 +212,58 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Widget _buildHeroSection(AuthService authService) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary,
+            AppColors.primaryLight,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: Column(
         children: [
           Text(
-            authService.isStaff ? 'Quản lý cửa hàng' : 'Cửa hàng quần áo xanh',
+            authService.isStaff ? 'Quản lý cửa hàng' : 'Thời trang xanh',
             style: const TextStyle(
-              fontSize: 28,
+              fontSize: 30,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
+              color: Colors.white,
               height: 1.2,
+              letterSpacing: -0.5,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(
             authService.isStaff 
-                ? 'Nạp điểm cho khách hàng, quản lý kho hàng và xem giao dịch'
-                : 'Nạp điểm, mua quần áo bằng điểm, hoặc đem quần áo cũ đến cửa hàng để đổi lấy điểm',
-            style: const TextStyle(
+                ? 'Nạp điểm cho khách hàng và quản lý kho hàng hiệu quả'
+                : 'Mua sắm thông minh, bảo vệ môi trường',
+            style: TextStyle(
               fontSize: 16,
-              color: Color(0xFF6B7280),
+              color: Colors.white.withOpacity(0.95),
               height: 1.5,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 28),
           Row(
             children: [
               Expanded(
-                child: _buildButton(
-                  authService.isStaff ? 'Nạp điểm cho KH' : 'Nạp điểm', 
+                child: _buildHeroButton(
+                  authService.isStaff ? 'Nạp điểm' : 'Nạp điểm', 
+                  Icons.account_balance_wallet_rounded,
                   true, 
                   () {
                     if (!authService.isLoggedIn) {
@@ -229,10 +284,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   }
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
-                child: _buildButton(
-                  authService.isStaff ? 'Quản lý kho' : 'Mua quần áo', 
+                child: _buildHeroButton(
+                  authService.isStaff ? 'Kho hàng' : 'Mua sắm', 
+                  authService.isStaff ? Icons.inventory_2_rounded : Icons.shopping_bag_rounded,
                   false, 
                   () {
                     Navigator.push(
@@ -248,141 +304,113 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       ),
     );
   }
-
-  Widget _buildButton(String text, bool isPrimary, [VoidCallback? onTap]) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 48,
-        decoration: BoxDecoration(
-          color: isPrimary ? const Color(0xFF22C55E) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: isPrimary ? null : Border.all(color: const Color(0xFF22C55E)),
-        ),
-        child: Center(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: isPrimary ? Colors.white : const Color(0xFF22C55E),
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+  
+  Widget _buildHeroButton(String text, IconData icon, bool isPrimary, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: isPrimary ? Colors.white : Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+            border: isPrimary ? null : Border.all(
+              color: Colors.white.withOpacity(0.4),
+              width: 1.5,
             ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: isPrimary ? AppColors.primary : Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                text,
+                style: TextStyle(
+                  color: isPrimary ? AppColors.primary : Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+
 
   Widget _buildStatistics() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          Expanded(child: _buildStat('10K+', 'Items Saved')),
-          Expanded(child: _buildStat('5K+', 'Happy Users')),
-          Expanded(child: _buildStat('2K+', 'CO2 Reduced')),
+          Expanded(child: _buildStatCard('10K+', 'Sản phẩm', Icons.checkroom_rounded, AppColors.primary)),
+          const SizedBox(width: 12),
+          Expanded(child: _buildStatCard('5K+', 'Người dùng', Icons.people_rounded, AppColors.info)),
+          const SizedBox(width: 12),
+          Expanded(child: _buildStatCard('2K+', 'Tấn CO₂', Icons.eco_rounded, AppColors.success)),
         ],
       ),
     );
   }
 
-  Widget _buildStat(String value, String label) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF22C55E),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF6B7280),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFeatureCards(AuthService authService) {
+  Widget _buildStatCard(String value, String label, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-            const Text(
-              'Cách thức hoạt động',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1F2937),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(child: _buildFeatureCard('Nạp điểm', 'Nạp điểm vào tài khoản', Icons.account_balance_wallet)),
-                const SizedBox(width: 16),
-                Expanded(child: _buildFeatureCard('Mua sắm', 'Dùng điểm mua quần áo', Icons.shopping_bag)),
-                const SizedBox(width: 16),
-                Expanded(child: _buildFeatureCard('Đổi quần áo', 'Đem quần áo cũ đến cửa hàng', Icons.swap_horiz)),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeatureCard(String title, String subtitle, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.border,
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: color.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF22C55E).withOpacity(0.1),
+              color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               icon,
-              color: const Color(0xFF22C55E),
+              color: color,
               size: 24,
             ),
           ),
           const SizedBox(height: 12),
           Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1F2937),
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: color,
+              letterSpacing: -0.5,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            subtitle,
-            style: const TextStyle(
+            label,
+            style: TextStyle(
               fontSize: 12,
-              color: Color(0xFF6B7280),
+              color: AppColors.mutedForeground,
+              fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
           ),
@@ -391,138 +419,81 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildWhyChooseSection() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+  Widget _buildFeatureCards(AuthService authService) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Why Choose Green Loop?',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'Cách thức hoạt động',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: AppColors.foreground,
+                letterSpacing: -0.5,
+              ),
             ),
           ),
-          const SizedBox(height: 24),
-          _buildWhyChooseItem('Eco-Friendly', 'Reduce fashion waste and carbon footprint'),
-          _buildWhyChooseItem('Affordable', 'Get quality items at fraction of retail price'),
-          _buildWhyChooseItem('Community', 'Join a community of conscious fashion lovers'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWhyChooseItem(String title, String description) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+          const SizedBox(height: 20),
+          _buildFeatureCard(
+            'Nạp điểm', 
+            'Nạp điểm vào tài khoản của bạn', 
+            Icons.account_balance_wallet_rounded,
+            AppColors.primary,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFF22C55E).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.check_circle,
-              color: Color(0xFF22C55E),
-              size: 20,
-            ),
+          const SizedBox(height: 12),
+          _buildFeatureCard(
+            'Mua sắm', 
+            'Dùng điểm mua quần áo thời trang', 
+            Icons.shopping_bag_rounded,
+            AppColors.info,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF6B7280),
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 12),
+          _buildFeatureCard(
+            'Đổi quần áo', 
+            'Đem quần áo cũ đến cửa hàng đổi điểm', 
+            Icons.autorenew_rounded,
+            AppColors.success,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBottomFeatureCards() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-      child: Column(
-        children: [
-          _buildBottomCard(
-            'Sustainable Fashion Platform',
-            'Join thousands of users making fashion more sustainable',
-            Icons.eco,
-          ),
-          const SizedBox(height: 16),
-          _buildBottomCard(
-            'Circular Economy',
-            'Extend the life of clothing through resale and trading',
-            Icons.recycling,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomCard(String title, String description, IconData icon) {
+  Widget _buildFeatureCard(String title, String subtitle, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.border,
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: AppColors.shadowLight,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              color: const Color(0xFF22C55E).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
               icon,
-              color: const Color(0xFF22C55E),
-              size: 24,
+              color: color,
+              size: 28,
             ),
           ),
           const SizedBox(width: 16),
@@ -532,40 +503,52 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.foreground,
+                    letterSpacing: -0.3,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  description,
-                  style: const TextStyle(
+                  subtitle,
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF6B7280),
+                    color: AppColors.mutedForeground,
+                    height: 1.4,
                   ),
                 ),
               ],
             ),
+          ),
+          Icon(
+            Icons.arrow_forward_ios_rounded,
+            color: AppColors.mutedForeground,
+            size: 16,
           ),
         ],
       ),
     );
   }
 
+
   Widget _buildQuickActions(AuthService authService) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Chức năng chính',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'Chức năng chính',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: AppColors.foreground,
+                letterSpacing: -0.5,
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -573,9 +556,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             children: authService.isStaff ? [
               Expanded(
                 child: _buildQuickActionCard(
-                  'Nạp điểm cho KH',
-                  Icons.account_balance_wallet,
-                  const Color(0xFF22C55E),
+                  'Nạp điểm',
+                  Icons.account_balance_wallet_rounded,
+                  AppColors.primary,
                   () {
                     if (!authService.isLoggedIn) {
                       Navigator.push(
@@ -594,9 +577,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildQuickActionCard(
-                  'Quản lý kho',
-                  Icons.inventory,
-                  const Color(0xFF3B82F6),
+                  'Kho hàng',
+                  Icons.inventory_2_rounded,
+                  AppColors.info,
                   () {
                     Navigator.push(
                       context,
@@ -608,11 +591,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildQuickActionCard(
-                  'Xem giao dịch',
-                  Icons.receipt_long,
+                  'Giao dịch',
+                  Icons.receipt_long_rounded,
                   const Color(0xFF8B5CF6),
                   () {
-                    // Navigation sẽ được xử lý bởi bottom navigation
+                    // Navigation handled by bottom navigation
                   },
                 ),
               ),
@@ -620,8 +603,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               Expanded(
                 child: _buildQuickActionCard(
                   'Nạp điểm',
-                  Icons.account_balance_wallet,
-                  const Color(0xFF22C55E),
+                  Icons.account_balance_wallet_rounded,
+                  AppColors.primary,
                   () {
                     if (!authService.isLoggedIn) {
                       Navigator.push(
@@ -640,9 +623,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildQuickActionCard(
-                  'Mua quần áo',
-                  Icons.shopping_bag,
-                  const Color(0xFF3B82F6),
+                  'Mua sắm',
+                  Icons.shopping_bag_rounded,
+                  AppColors.info,
                   () {
                     Navigator.push(
                       context,
@@ -654,9 +637,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildQuickActionCard(
-                  'Đổi quần áo',
-                  Icons.swap_horiz,
-                  const Color(0xFF8B5CF6),
+                  'Đổi đồ',
+                  Icons.autorenew_rounded,
+                  AppColors.success,
                   () {
                     _showExchangeDialog(context, authService);
                   },
@@ -670,198 +653,160 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildQuickActionCard(String title, IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1F2937),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNewsletterSection() {
-    return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF22C55E).withOpacity(0.1),
-            const Color(0xFF16A34A).withOpacity(0.1),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.2)),
-      ),
-      child: Column(
-        children: [
-          const Icon(
-            Icons.email,
-            color: Color(0xFF22C55E),
-            size: 48,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Stay Updated',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.border,
+              width: 1,
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Get the latest updates on sustainable fashion and exclusive offers',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF6B7280),
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
-                  ),
-                  child: const Text(
-                    'Enter your email',
-                    style: TextStyle(
-                      color: Color(0xFF6B7280),
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Subscribed successfully!'),
-                      backgroundColor: Color(0xFF22C55E),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF22C55E),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text('Subscribe'),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.shadowLight,
+                blurRadius: 8,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-        ],
+          child: Column(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.foreground,
+                  letterSpacing: -0.2,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
-
 
   void _showExchangeDialog(BuildContext context, AuthService authService) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Đổi quần áo lấy điểm'),
-        content: const Column(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          'Đổi quần áo lấy điểm',
+          style: TextStyle(
+            color: AppColors.foreground,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.store,
-              size: 64,
-              color: Color(0xFF22C55E),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                Icons.store_rounded,
+                size: 64,
+                color: AppColors.primary,
+              ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 20),
             Text(
               'Đem quần áo cũ đến cửa hàng để đổi lấy điểm',
               textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Địa chỉ: 123 Đường ABC, Quận 1, TP.HCM',
               style: TextStyle(
-                fontSize: 12,
-                color: Color(0xFF6B7280),
+                color: AppColors.foreground,
+                fontSize: 15,
               ),
-              textAlign: TextAlign.center,
             ),
-            SizedBox(height: 8),
-            Text(
-              'Giờ mở cửa: 8:00 - 20:00',
-              style: TextStyle(
-                fontSize: 12,
-                color: Color(0xFF6B7280),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.muted,
+                borderRadius: BorderRadius.circular(12),
               ),
-              textAlign: TextAlign.center,
+              child: Column(
+                children: [
+                  Text(
+                    'Địa chỉ: 123 Đường ABC, Quận 1, TP.HCM',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.mutedForeground,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Giờ mở cửa: 8:00 - 20:00',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.mutedForeground,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
+            child: Text(
+              'Đóng',
+              style: TextStyle(color: AppColors.mutedForeground),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Đã ghi nhận! Hãy đến cửa hàng để đổi quần áo'),
-                  backgroundColor: Color(0xFF22C55E),
+                SnackBar(
+                  content: const Text('Đã ghi nhận! Hãy đến cửa hàng để đổi quần áo'),
+                  backgroundColor: AppColors.primary,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF22C55E),
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('Xác nhận'),
           ),

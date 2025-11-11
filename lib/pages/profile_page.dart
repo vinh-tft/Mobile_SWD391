@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import 'admin_dashboard_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -99,6 +100,31 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       ),
                     ),
+                    // Admin View Button (only for admin users)
+                    if (user?.role == UserRole.staff || authService.isAdmin)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AdminDashboardPage(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.admin_panel_settings, size: 20),
+                          label: const Text('Chế độ quản trị'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -117,6 +143,14 @@ class _ProfilePageState extends State<ProfilePage> {
             margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Column(
               children: [
+                // Admin Dashboard - Only for staff
+                if (authService.isStaff)
+                  _buildProfileMenuItem(
+                    Icons.dashboard,
+                    'Admin Dashboard',
+                    () => _showAdminDashboard(),
+                    color: const Color(0xFF3B82F6),
+                  ),
                 _buildProfileMenuItem(Icons.shopping_bag, 'My Orders', () => _showOrdersPage()),
                 _buildProfileMenuItem(Icons.favorite, 'Loved Items', () {}),
                 _buildProfileMenuItem(Icons.sell, 'My Listings', () => _showListingsPage()),
@@ -204,7 +238,8 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildProfileMenuItem(IconData icon, String title, VoidCallback onTap) {
+  Widget _buildProfileMenuItem(IconData icon, String title, VoidCallback onTap, {Color? color}) {
+    final iconColor = color ?? const Color(0xFF22C55E);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -220,7 +255,7 @@ class _ProfilePageState extends State<ProfilePage> {
         ],
       ),
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFF22C55E), size: 24),
+        leading: Icon(icon, color: iconColor, size: 24),
         title: Text(
           title,
           style: const TextStyle(
@@ -231,6 +266,15 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         trailing: const Icon(Icons.arrow_forward_ios, color: Color(0xFF6B7280), size: 16),
         onTap: onTap,
+      ),
+    );
+  }
+
+  void _showAdminDashboard() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AdminDashboardPage(),
       ),
     );
   }

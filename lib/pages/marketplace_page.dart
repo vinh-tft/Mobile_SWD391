@@ -2,15 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/items_service.dart';
-import '../services/clothing_service.dart';
-import '../models/clothing_item.dart';
+import '../services/categories_service.dart';
+import '../services/brands_service.dart';
+import '../theme/app_colors.dart';
 import '../models/api_models.dart';
 import 'create_listing_page.dart';
 import 'add_category_page.dart';
 import 'add_brand_page.dart';
 import 'product_detail_page.dart';
-import 'checkout_page.dart';
-import 'posts_page.dart';
 import 'add_sale_item_page.dart';
 
 class MarketplacePage extends StatefulWidget {
@@ -22,10 +21,17 @@ class MarketplacePage extends StatefulWidget {
 
 class _MarketplacePageState extends State<MarketplacePage> {
   final TextEditingController _searchController = TextEditingController();
-  String _selectedCategory = 'Clothing';
-  String _selectedSort = 'Popular';
-  List<String> _categories = ['Clothing'];
-  List<String> _sortOptions = ['Popular', 'Price Low to High', 'Price High to Low', 'Newest', 'Rating'];
+  String? _selectedCategoryId;
+  String? _selectedBrandId;
+  String _selectedSort = 'Newest';
+  final List<String> _sortOptions = ['Newest', 'Price: Low to High', 'Price: High to Low', 'Popular'];
+  
+  // Filter states
+  String? _selectedCondition;
+  bool? _verifiedOnly;
+  int? _minPrice;
+  int? _maxPrice;
+  
   bool _requestedLoad = false;
   
   @override
@@ -37,645 +43,363 @@ class _MarketplacePageState extends State<MarketplacePage> {
   @override
   void initState() {
     super.initState();
-    // Defer API load to after first frame to avoid setState during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !_requestedLoad) {
         _requestedLoad = true;
-        // Load marketplace-ready items so the product grid shows data
-        context.read<ItemsService>().loadMarketplaceReady();
+        _loadData();
       }
     });
   }
 
+  Future<void> _loadData() async {
+    await Future.wait([
+      context.read<ItemsService>().loadMarketplaceReady(),
+      context.read<CategoriesService>().loadActiveCategories(),
+      context.read<BrandsService>().loadActiveBrands(),
+    ]);
+  }
+
+  Future<void> _refreshData() async {
+    await _loadData();
+  }
+
+  Future<void> _searchItems() async {
+    final query = _searchController.text.trim();
+    if (query.isNotEmpty) {
+      await context.read<ItemsService>().searchItems(query);
+    } else {
+      await context.read<ItemsService>().loadMarketplaceReady();
+    }
+  }
+
+  List<ItemSummaryResponse> _getFilteredItems(List<ItemSummaryResponse> items) {
+    var filtered = items;
+
+    // Filter by category (using category name)
+    if (_selectedCategoryId != null) {
+      try {
+        final categoriesService = context.read<CategoriesService>();
+        if (categoriesService.categories.isNotEmpty) {
+          final selectedCategory = categoriesService.categories.firstWhere(
+            (cat) => cat.categoryId == _selectedCategoryId,
+            orElse: () => categoriesService.categories.first,
+          );
+          filtered = filtered.where((item) => item.categoryName == selectedCategory.name).toList();
+        }
+      } catch (e) {
+        // If category not found, skip filter
+      }
+    }
+
+    // Filter by brand (using brand name)
+    if (_selectedBrandId != null) {
+      try {
+        final brandsService = context.read<BrandsService>();
+        if (brandsService.brands.isNotEmpty) {
+          final selectedBrand = brandsService.brands.firstWhere(
+            (brand) => brand.brandId == _selectedBrandId,
+            orElse: () => brandsService.brands.first,
+          );
+          filtered = filtered.where((item) => item.brandName == selectedBrand.name).toList();
+        }
+      } catch (e) {
+        // If brand not found, skip filter
+      }
+    }
+
+    // Filter by condition
+    if (_selectedCondition != null) {
+      filtered = filtered.where((item) => 
+        item.condition.toString().split('.').last == _selectedCondition
+      ).toList();
+    }
+
+    // Filter by verified status
+    if (_verifiedOnly == true) {
+      filtered = filtered.where((item) => item.status == ItemStatus.VERIFIED).toList();
+    }
+
+    // Filter by price range
+    if (_minPrice != null) {
+      filtered = filtered.where((item) => item.pointValue >= _minPrice!).toList();
+    }
+    if (_maxPrice != null) {
+      filtered = filtered.where((item) => item.pointValue <= _maxPrice!).toList();
+    }
+
+    // Sort items
+    switch (_selectedSort) {
+      case 'Price: Low to High':
+        filtered.sort((a, b) => a.pointValue.compareTo(b.pointValue));
+        break;
+      case 'Price: High to Low':
+        filtered.sort((a, b) => b.pointValue.compareTo(a.pointValue));
+        break;
+      case 'Newest':
+        // Sort by createdAt string (ISO format can be compared as strings)
+        filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case 'Popular':
+        // Sort by viewCount + likeCount
+        filtered.sort((a, b) => 
+          (b.viewCount + b.likeCount).compareTo(a.viewCount + a.likeCount)
+        );
+        break;
+    }
+
+    return filtered;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Consumer2<AuthService, ClothingService>(
-      builder: (context, authService, clothingService, child) {
-        // Debug staff status
-        print('🔍 Marketplace - isStaff: ${authService.isStaff}');
-        print('🔍 Marketplace - currentUser: ${authService.currentUser?.role}');
-        
-    return Scaffold(
-      backgroundColor: Colors.white,
-          body: _buildBody(authService, clothingService),
-          // FloatingActionButton cho staff để thêm quần áo
-          floatingActionButton: authService.isStaff ? FloatingActionButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CreateListingPage()),
-              );
-            },
-            backgroundColor: const Color(0xFF22C55E),
-            child: const Icon(Icons.add, color: Colors.white),
-            tooltip: 'Thêm quần áo mới',
-          ) : null,
+    return Consumer<AuthService>(
+      builder: (context, authService, child) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: RefreshIndicator(
+            onRefresh: _refreshData,
+            color: AppColors.primary,
+            child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                // Header
+            _buildHeader(authService),
+          
+          // Search Bar
+                _buildSearchBar(),
+                
+                // Category Chips
+                _buildCategoryChips(),
+                
+                // Sort and Filter Bar
+                _buildSortFilterBar(),
+                
+                // Items Grid
+                _buildItemsGrid(),
+              ],
+            ),
+          ),
+          floatingActionButton: authService.isStaff ? _buildStaffFAB(context) : null,
         );
       },
     );
   }
 
-  Widget _buildBody(AuthService authService, ClothingService clothingService) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // Header Section
-          _buildHeader(authService),
-          
-          // Sale Title
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Bán hàng',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                // Nút thêm quần áo nổi bật cho staff
-                if (authService.isStaff)
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const CreateListingPage()),
-                      );
-                    },
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Thêm sale'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF22C55E),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          
-          // Search Bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.search, color: Color(0xFF6B7280), size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: 'Tìm kiếm sale...',
-                      hintStyle: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 16,
-                      ),
-                      border: InputBorder.none,
-                    ),
-                    onChanged: (value) {
-                      setState(() {});
-                    },
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => _showFilterBottomSheet(),
-                  child: const Icon(Icons.filter_list, color: Color(0xFF6B7280), size: 20),
-                ),
-              ],
-            ),
-          ),
-          
-          // Category Filter
-          _buildCategoryFilter(),
-          
-          // Sort and Results
-          _buildSortAndResults(clothingService),
-          
-          // Categories
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Danh mục',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(child: _buildCategoryCard('Áo', Icons.checkroom)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildCategoryCard('Quần', Icons.accessibility)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildCategoryCard('Giày', Icons.sports_soccer)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildCategoryCard('Khác', Icons.more_horiz)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          // Featured Products (from API)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Quần áo có sẵn',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Consumer<ItemsService>(
-                  builder: (context, itemsService, _) {
-                    // Data rendering
-                    if (itemsService.loading) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    final items = itemsService.items;
-                    final err = itemsService.error;
-                    if (err != null && items.isEmpty) {
-                      return Container(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.error_outline, color: Colors.red, size: 32),
-                            const SizedBox(height: 8),
-                            Text(
-                              err,
-                              style: const TextStyle(color: Colors.red),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                    if (items.isEmpty) {
-                      return _buildEmptyState();
-                    }
-
-                    return GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.68,
-                      children: items.map((item) {
-                        final title = item.name;
-                        final images = item.primaryImageUrl != null ? [item.primaryImageUrl!] : <String>[];
-                        final condition = item.condition.toString().split('.').last;
-                        final size = item.size;
-                        final brand = item.brandName ?? '';
-                        final pointValue = item.pointValue;
-
-                        return _buildProductCard(
+  Widget _buildStaffFAB(BuildContext context) {
+    return FloatingActionButton.extended(
+      onPressed: () {
+        Navigator.push(
                           context,
-                          title,
-                          '$pointValue điểm',
-                          '4.5',
-                          item.description,
-                          images,
-                          item.ownerName,
-                          condition,
-                          size,
-                          brand,
-                        );
-                      }).toList(),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+          MaterialPageRoute(builder: (_) => const CreateListingPage()),
+        );
+      },
+      backgroundColor: AppColors.primary,
+      icon: const Icon(Icons.add, color: Colors.white),
+      label: const Text('Thêm sản phẩm', style: TextStyle(color: Colors.white)),
     );
   }
 
   Widget _buildHeader(AuthService authService) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Logo
-          Flexible(
-            child: Row(
+    return SliverAppBar(
+      floating: true,
+      backgroundColor: AppColors.card,
+      elevation: 0,
+      title: Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+            width: 36,
+            height: 36,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF22C55E),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Icon(
-                    Icons.recycling,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Flexible(
-                  child: Text(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.recycling, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Text(
                     'Green Loop',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
-                    ),
-                    overflow: TextOverflow.ellipsis,
+              color: AppColors.foreground,
+              letterSpacing: -0.5,
                   ),
                 ),
               ],
             ),
-          ),
-          Row(
-            children: [
-              // Points chip
+      actions: [
+        // Points badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 margin: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF22C55E).withOpacity(0.1),
+            color: AppColors.accent,
                   borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.stars,
-                      color: Color(0xFF22C55E),
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
+              Icon(Icons.stars_rounded, color: AppColors.primary, size: 18),
+              const SizedBox(width: 6),
                     Text(
-                      '${authService.currentUser?.points ?? 0} điểm',
-                      style: const TextStyle(
-                        color: Color(0xFF22C55E),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                '${authService.currentUser?.points ?? 0}',
+                style: TextStyle(
+                  color: AppColors.accentForeground,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
                 ),
               ),
-              // Nút thêm quần áo và danh mục cho staff
+        // Staff actions
               if (authService.isStaff) ...[
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline, color: Color(0xFF22C55E), size: 24),
-                  tooltip: 'Thêm quần áo',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CreateListingPage()),
-                    );
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.category_outlined, color: Color(0xFF3B82F6), size: 24),
-                  tooltip: 'Thêm danh mục',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AddCategoryPage()),
-                    );
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.sell_outlined, color: Color(0xFFF59E0B), size: 24),
-                  tooltip: 'Thêm thương hiệu',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AddBrandPage()),
-                    );
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.receipt_long_outlined, color: Color(0xFF10B981), size: 24),
-                  tooltip: 'Thêm sale item',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AddSaleItemPage()),
-                    );
-                  },
-                ),
-                const SizedBox(width: 8),
-              ],
-              IconButton(
-                icon: const Icon(Icons.article_outlined, color: Color(0xFF6B7280), size: 24),
-                tooltip: 'Bài đăng',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const PostsPage()),
-                  );
-                },
-              ),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: AppColors.mutedForeground),
+            onSelected: (value) {
+              switch (value) {
+                case 'add_item':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateListingPage()));
+                  break;
+                case 'add_category':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AddCategoryPage()));
+                  break;
+                case 'add_brand':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AddBrandPage()));
+                  break;
+                case 'add_sale':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AddSaleItemPage()));
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'add_item', child: Text('Thêm sản phẩm')),
+              const PopupMenuItem(value: 'add_category', child: Text('Thêm danh mục')),
+              const PopupMenuItem(value: 'add_brand', child: Text('Thêm thương hiệu')),
+              const PopupMenuItem(value: 'add_sale', child: Text('Thêm sale')),
             ],
           ),
-        ],
-      ),
+        ] else
+                const SizedBox(width: 8),
+              ],
     );
   }
 
-  Widget _buildCategoryCard(String title, IconData icon) {
-    return Container(
+  Widget _buildSearchBar() {
+    return SliverToBoxAdapter(
+      child: Padding(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: const Color(0xFF22C55E), size: 32),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Color(0xFF1F2937),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProductCard(
-    BuildContext context,
-    String title,
-    String price,
-    String rating,
-    String description,
-    List<String> images,
-    String seller,
-    String condition,
-    String size,
-    String brand,
-  ) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProductDetailPage(
-              title: title,
-              price: price,
-              rating: rating,
-              description: description,
-              images: images,
-              seller: seller,
-              condition: condition,
-              size: size,
-              brand: brand,
-            ),
-          ),
-        );
-      },
       child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.white,
+            color: AppColors.input,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
           children: [
-            // Product Image
+              Icon(Icons.search, color: AppColors.mutedForeground, size: 22),
+              const SizedBox(width: 12),
             Expanded(
-              flex: 3,
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Tìm kiếm sản phẩm...',
+                    hintStyle: TextStyle(color: AppColors.mutedForeground, fontSize: 15),
+                    border: InputBorder.none,
                   ),
+                  onSubmitted: (_) => _searchItems(),
                 ),
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
-                      ),
-                      child: images.isNotEmpty
-                          ? Image.network(
-                              images.first,
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => const Center(
-                                child: Icon(
-                                  Icons.broken_image,
-                                  color: Color(0xFF6B7280),
-                                  size: 40,
-                                ),
-                              ),
-                            )
-                          : const Center(
-                              child: Icon(
-                                Icons.image,
-                                color: Color(0xFF6B7280),
-                                size: 40,
-                              ),
-                            ),
-                    ),
-                    // Favorite button
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
+              ),
+              if (_searchController.text.isNotEmpty)
+                IconButton(
+                  icon: Icon(Icons.clear, color: AppColors.mutedForeground, size: 20),
+                  onPressed: () {
+                    setState(() {
+                      _searchController.clear();
+                    });
+                    _searchItems();
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.favorite_border,
-                          color: Color(0xFF6B7280),
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // Product Info
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Color(0xFF1F2937),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.star, color: Color(0xFFFBBF24), size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          rating,
-                          style: const TextStyle(
-                            color: Color(0xFF6B7280),
-                            fontSize: 12,
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF22C55E).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            condition,
-                            style: const TextStyle(
-                              color: Color(0xFF22C55E),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            price,
-                            style: const TextStyle(
-                              color: Color(0xFF22C55E),
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF22C55E).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Icon(
-                            Icons.arrow_forward_ios,
-                            color: Color(0xFF22C55E),
-                            size: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );
   }
 
-  Widget _buildCategoryFilter() {
+  Widget _buildCategoryChips() {
+    return SliverToBoxAdapter(
+      child: Consumer<CategoriesService>(
+        builder: (context, categoriesService, _) {
+          if (categoriesService.loading) {
+            return const SizedBox(
+              height: 60,
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final categories = categoriesService.categories;
+          
     return Container(
       height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: _categories.length,
+              itemCount: categories.length + 1,
         itemBuilder: (context, index) {
-          final category = _categories[index];
-          final isSelected = _selectedCategory == category;
-          
+                if (index == 0) {
+                  // "All" chip
+                  final isSelected = _selectedCategoryId == null;
           return Container(
-            margin: const EdgeInsets.only(right: 12),
-            child: GestureDetector(
-              onTap: () {
+                    margin: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: const Text('Tất cả'),
+                      selected: isSelected,
+                      onSelected: (selected) {
                 setState(() {
-                  _selectedCategory = category;
+                          _selectedCategoryId = null;
                 });
               },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF22C55E) : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected ? const Color(0xFF22C55E) : const Color(0xFFE5E7EB),
-                  ),
-                ),
-                child: Text(
-                  category,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : const Color(0xFF6B7280),
-                    fontSize: 14,
+                      backgroundColor: AppColors.card,
+                      selectedColor: AppColors.primary,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : AppColors.mutedForeground,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        fontSize: 14,
+                      ),
+                      side: BorderSide(color: isSelected ? AppColors.primary : AppColors.border),
+                    ),
+                  );
+                }
+                
+                final category = categories[index - 1];
+                final isSelected = _selectedCategoryId == category.categoryId;
+                
+                return Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(category.name),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        _selectedCategoryId = selected ? category.categoryId : null;
+                      });
+                    },
+                    backgroundColor: AppColors.card,
+                    selectedColor: AppColors.primary,
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.mutedForeground,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontSize: 14,
                   ),
+                    side: BorderSide(color: isSelected ? AppColors.primary : AppColors.border),
                 ),
-              ),
+                );
+              },
             ),
           );
         },
@@ -683,64 +407,148 @@ class _MarketplacePageState extends State<MarketplacePage> {
     );
   }
 
-  Widget _buildSortAndResults(ClothingService clothingService) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+  Widget _buildSortFilterBar() {
+    return SliverToBoxAdapter(
+      child: Consumer<ItemsService>(
+        builder: (context, itemsService, _) {
+          final filteredItems = _getFilteredItems(itemsService.items);
+          
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            '${_getFilteredClothing(clothingService).length} sản phẩm',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF6B7280),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => _showSortBottomSheet(),
-            child: Row(
-              children: [
-                const Text(
-                  'Sắp xếp: ',
+                  '${filteredItems.length} sản phẩm',
                   style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF6B7280),
+                    fontSize: 15,
+                    color: AppColors.mutedForeground,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
+                Row(
+              children: [
+                    // Sort button
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _showSortBottomSheet,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.border),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.sort, color: AppColors.primary, size: 18),
+                              const SizedBox(width: 6),
                 Text(
                   _selectedSort,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF22C55E),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const Icon(
-                  Icons.keyboard_arrow_down,
-                  color: Color(0xFF22C55E),
-                  size: 16,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Filter button
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _showFilterBottomSheet,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: _hasActiveFilters() ? AppColors.primary : Colors.transparent,
+                            border: Border.all(
+                              color: _hasActiveFilters() ? AppColors.primary : AppColors.border
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.filter_list,
+                            color: _hasActiveFilters() ? Colors.white : AppColors.mutedForeground,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
-  List<ClothingItem> _getFilteredClothing(ClothingService clothingService) {
-    List<ClothingItem> items = clothingService.clothingItems;
-
-    // Filter by search
-    if (_searchController.text.isNotEmpty) {
-      items = clothingService.searchClothing(_searchController.text);
-    }
-
-    return items;
+  bool _hasActiveFilters() {
+    return _selectedBrandId != null ||
+           _selectedCondition != null ||
+           _verifiedOnly == true ||
+           _minPrice != null ||
+           _maxPrice != null;
   }
 
-  Widget _buildClothingCard(BuildContext context, ClothingItem item) {
-    return GestureDetector(
+  Widget _buildItemsGrid() {
+    return Consumer<ItemsService>(
+      builder: (context, itemsService, _) {
+        if (itemsService.loading) {
+          return const SliverFillRemaining(
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final error = itemsService.error;
+        if (error != null && itemsService.items.isEmpty) {
+          return SliverFillRemaining(
+            child: _buildErrorState(error),
+          );
+        }
+
+        final filteredItems = _getFilteredItems(itemsService.items);
+        
+        if (filteredItems.isEmpty) {
+          return SliverFillRemaining(
+            child: _buildEmptyState(),
+          );
+        }
+
+        return SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.7,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final item = filteredItems[index];
+                return _buildProductCard(item);
+              },
+              childCount: filteredItems.length,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProductCard(ItemSummaryResponse item) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
       onTap: () {
         Navigator.push(
           context,
@@ -750,25 +558,26 @@ class _MarketplacePageState extends State<MarketplacePage> {
               price: '${item.pointValue} điểm',
               rating: '4.5',
               description: item.description,
-              images: item.images,
-              seller: 'Cửa hàng',
-              condition: item.conditionDisplayName,
+                images: item.primaryImageUrl != null ? [item.primaryImageUrl!] : [],
+                seller: item.ownerName,
+                condition: item.condition.toString().split('.').last,
               size: item.size,
-              brand: item.brand,
+                brand: item.brandName ?? '',
             ),
           ),
         );
       },
+        borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+                color: AppColors.shadowLight,
               blurRadius: 8,
-              offset: const Offset(0, 2),
+                offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -778,56 +587,51 @@ class _MarketplacePageState extends State<MarketplacePage> {
             // Product Image
             Expanded(
               flex: 3,
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
-                ),
                 child: Stack(
                   children: [
-                    ClipRRect(
+                    Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                        color: AppColors.muted,
+                  borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                  ),
+                ),
+                      child: ClipRRect(
                       borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
                       ),
-                      child: item.images.isNotEmpty
+                        child: item.primaryImageUrl != null
                           ? Image.network(
-                              item.images.first,
-                              width: double.infinity,
-                              height: double.infinity,
+                                item.primaryImageUrl!,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => const Center(
-                                child: Icon(
+                                errorBuilder: (_, __, ___) => Icon(
                                   Icons.broken_image,
-                                  color: Color(0xFF6B7280),
+                                  color: AppColors.mutedForeground,
                                   size: 40,
-                                ),
                               ),
                             )
-                          : const Center(
-                              child: Icon(
+                            : Icon(
                                 Icons.image,
-                                color: Color(0xFF6B7280),
+                                color: AppColors.mutedForeground,
                                 size: 40,
                               ),
                             ),
                     ),
-                    // Category badge
+                    // Condition badge
                     Positioned(
                       top: 8,
-                      left: 8,
+                      right: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF22C55E).withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(12),
+                          color: AppColors.primary.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          item.categoryDisplayName,
+                          item.condition.toString().split('.').last,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -837,7 +641,6 @@ class _MarketplacePageState extends State<MarketplacePage> {
                       ),
                     ),
                   ],
-                ),
               ),
             ),
             // Product Info
@@ -850,64 +653,51 @@ class _MarketplacePageState extends State<MarketplacePage> {
                   children: [
                     Text(
                       item.name,
-                      style: const TextStyle(
-                        color: Color(0xFF1F2937),
+                        style: TextStyle(
+                          color: AppColors.foreground,
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF22C55E).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            item.conditionDisplayName,
-                            style: const TextStyle(
-                              color: Color(0xFF22C55E),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
+                      const SizedBox(height: 6),
+                      if (item.brandName != null)
                         Text(
-                          'Size: ${item.size}',
-                          style: const TextStyle(
-                            color: Color(0xFF6B7280),
+                          item.brandName!,
+                          style: TextStyle(
+                            color: AppColors.mutedForeground,
                             fontSize: 12,
                           ),
-                        ),
-                      ],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                     ),
                     const Spacer(),
                     Row(
                       children: [
+                          Icon(Icons.stars_rounded, color: AppColors.primary, size: 16),
+                          const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             '${item.pointValue} điểm',
-                            style: const TextStyle(
-                              color: Color(0xFF22C55E),
+                              style: TextStyle(
+                                color: AppColors.primary,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
+                                letterSpacing: -0.3,
                             ),
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.all(4),
+                            padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF22C55E).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Icon(
-                            Icons.arrow_forward_ios,
-                            color: Color(0xFF22C55E),
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              color: AppColors.primary,
                             size: 12,
                           ),
                         ),
@@ -918,116 +708,70 @@ class _MarketplacePageState extends State<MarketplacePage> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );
   }
 
-  void _showFilterBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
-                borderRadius: BorderRadius.circular(2),
+                color: AppColors.muted,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(
+                Icons.search_off_rounded,
+                color: AppColors.mutedForeground,
+                size: 64,
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Text(
-                'Filters',
+            const SizedBox(height: 20),
+            Text(
+              'Không tìm thấy sản phẩm',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F2937),
-                ),
+                color: AppColors.foreground,
               ),
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildFilterSection('Price Range', [
-                      'Under \$25',
-                      '\$25 - \$50',
-                      '\$50 - \$100',
-                      'Over \$100',
-                    ]),
-                    _buildFilterSection('Condition', [
-                      'New',
-                      'Like New',
-                      'Good',
-                      'Fair',
-                    ]),
-                    _buildFilterSection('Size', [
-                      'XS', 'S', 'M', 'L', 'XL', 'XXL',
-                    ]),
-                    _buildFilterSection('Brand', [
-                      'Levi\'s',
-                      'Patagonia',
-                      'Allbirds',
-                      'Fjällräven',
-                    ]),
-                  ],
-                ),
+            const SizedBox(height: 8),
+            Text(
+              'Thử điều chỉnh từ khóa tìm kiếm hoặc bộ lọc',
+              style: TextStyle(
+                fontSize: 15,
+                color: AppColors.mutedForeground,
               ),
+              textAlign: TextAlign.center,
             ),
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFFE5E7EB)),
-                        foregroundColor: const Color(0xFF6B7280),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('Reset'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton(
+            const SizedBox(height: 24),
+            ElevatedButton(
                       onPressed: () {
-                        Navigator.pop(context);
-                        setState(() {});
+                setState(() {
+                  _searchController.clear();
+                  _selectedCategoryId = null;
+                  _selectedBrandId = null;
+                  _selectedCondition = null;
+                  _verifiedOnly = null;
+                  _minPrice = null;
+                  _maxPrice = null;
+                });
+                _refreshData();
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF22C55E),
+                backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('Apply Filters'),
-                    ),
-                  ),
-                ],
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
+              child: const Text('Xóa bộ lọc'),
             ),
           ],
         ),
@@ -1035,48 +779,45 @@ class _MarketplacePageState extends State<MarketplacePage> {
     );
   }
 
-  Widget _buildFilterSection(String title, List<String> options) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
         children: [
+            Icon(Icons.error_outline, color: AppColors.destructive, size: 64),
+            const SizedBox(height: 16),
           Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1F2937),
+              'Đã xảy ra lỗi',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.foreground,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: options.map((option) {
-              return GestureDetector(
-                onTap: () {
-                  // Handle filter selection
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
-                  ),
-                  child: Text(
-                    option,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              error,
+              style: TextStyle(
+                fontSize: 15,
+                color: AppColors.mutedForeground,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _refreshData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Thử lại'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1086,9 +827,9 @@ class _MarketplacePageState extends State<MarketplacePage> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(20),
             topRight: Radius.circular(20),
           ),
@@ -1101,18 +842,18 @@ class _MarketplacePageState extends State<MarketplacePage> {
               height: 4,
               margin: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
+                color: AppColors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.all(20),
+            Padding(
+              padding: const EdgeInsets.all(20),
               child: Text(
-                'Sort by',
+                'Sắp xếp',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F2937),
+                  color: AppColors.foreground,
                 ),
               ),
             ),
@@ -1122,13 +863,11 @@ class _MarketplacePageState extends State<MarketplacePage> {
                 title: Text(
                   option,
                   style: TextStyle(
-                    color: isSelected ? const Color(0xFF22C55E) : const Color(0xFF1F2937),
+                    color: isSelected ? AppColors.primary : AppColors.foreground,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
-                trailing: isSelected
-                    ? const Icon(Icons.check, color: Color(0xFF22C55E))
-                    : null,
+                trailing: isSelected ? Icon(Icons.check, color: AppColors.primary) : null,
                 onTap: () {
                   setState(() {
                     _selectedSort = option;
@@ -1144,52 +883,253 @@ class _MarketplacePageState extends State<MarketplacePage> {
     );
   }
 
-  Widget _buildEmptyState() {
-    return Container(
-      padding: const EdgeInsets.all(40),
+  void _showFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.9,
+        builder: (_, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
       child: Column(
         children: [
-          const Icon(
-            Icons.search_off,
-            color: Color(0xFF6B7280),
-            size: 64,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Không tìm thấy sản phẩm',
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Bộ lọc',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1F2937),
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.foreground,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Thử điều chỉnh từ khóa tìm kiếm hoặc bộ lọc',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF6B7280),
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
+                    TextButton(
             onPressed: () {
               setState(() {
-                _searchController.clear();
-                _selectedCategory = 'Clothing';
-              });
+                  _selectedBrandId = null;
+                  _selectedCondition = null;
+                  _verifiedOnly = null;
+                  _minPrice = null;
+                  _maxPrice = null;
+                });
+              },
+                      child: Text(
+                        'Xóa tất cả',
+                        style: TextStyle(color: AppColors.primary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Verified Filter
+                        _buildFilterSection(
+                          'Trạng thái',
+                          Column(
+                            children: [
+                              CheckboxListTile(
+                                title: Row(
+                                  children: [
+                                    Icon(Icons.verified, color: AppColors.primary, size: 20),
+                                    const SizedBox(width: 8),
+                                    const Text('Chỉ hiển thị đã xác minh'),
+                                  ],
+                                ),
+                                value: _verifiedOnly ?? false,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _verifiedOnly = value;
+                                  });
+                                },
+                                activeColor: AppColors.primary,
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Brand Filter
+                        _buildFilterSection(
+                          'Thương hiệu',
+                          Consumer<BrandsService>(
+                            builder: (context, brandsService, _) {
+                              if (brandsService.loading) {
+                                return const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(20.0),
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+                              }
+                              
+                              if (brandsService.brands.isEmpty) {
+                                return Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Text(
+                                    'Không có thương hiệu nào',
+                                    style: TextStyle(color: AppColors.mutedForeground),
+                                  ),
+                                );
+                              }
+                              
+                              return Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: brandsService.brands.map((brand) {
+                                  final isSelected = _selectedBrandId == brand.brandId;
+                                  return FilterChip(
+                                    label: Text(brand.name),
+                                    selected: isSelected,
+                                    onSelected: (selected) {
+                                      setState(() {
+                                        _selectedBrandId = selected ? brand.brandId : null;
+                                      });
+                                    },
+                                    backgroundColor: AppColors.muted,
+                                    selectedColor: AppColors.primary,
+                                    labelStyle: TextStyle(
+                                      color: isSelected ? Colors.white : AppColors.foreground,
+                                      fontSize: 13,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
+                        ),
+                        // Condition Filter
+                        _buildFilterSection(
+                          'Tình trạng',
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: ['EXCELLENT', 'GOOD', 'FAIR', 'POOR'].map((condition) {
+                              final isSelected = _selectedCondition == condition;
+                              final displayName = {
+                                'EXCELLENT': 'Xuất sắc',
+                                'GOOD': 'Tốt',
+                                'FAIR': 'Khá',
+                                'POOR': 'Cần sửa',
+                              }[condition] ?? condition;
+                              
+                              return FilterChip(
+                                label: Text(displayName),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  setState(() {
+                                    _selectedCondition = selected ? condition : null;
+                                  });
+                                },
+                                backgroundColor: AppColors.muted,
+                                selectedColor: AppColors.primary,
+                                labelStyle: TextStyle(
+                                  color: isSelected ? Colors.white : AppColors.foreground,
+                                  fontSize: 13,
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: AppColors.border)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: AppColors.border),
+                          foregroundColor: AppColors.mutedForeground,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Hủy'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          setState(() {});
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF22C55E),
+                          backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Áp dụng'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            child: const Text('Xóa bộ lọc'),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterSection(String title, Widget content) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.foreground,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 12),
+          content,
         ],
       ),
     );

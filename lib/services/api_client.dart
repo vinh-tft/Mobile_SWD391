@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 class ApiClient {
   ApiClient({http.Client? httpClient, String? baseUrl, String? token})
       : _http = httpClient ?? http.Client(),
-        _baseUrl = _normalizeBaseUrl(baseUrl ?? 'http://localhost:8085'),
+        _baseUrl = _normalizeBaseUrl(baseUrl ?? 'http://localhost:8080'),
         _token = token;
 
   final http.Client _http;
@@ -57,9 +57,15 @@ class ApiClient {
 
   Future<dynamic> post(String path, {Object? body, Map<String, dynamic>? query, Duration? timeout}) async {
     try {
+      final uri = _uri(path, query);
+      print('🌐 POST Request');
+      print('📍 URL: $uri');
+      print('🏠 Base URL: $_baseUrl');
+      print('📝 Path: $path');
+      
       final res = await _http
           .post(
-            _uri(path, query),
+            uri,
             headers: _headers(),
             body: body is String ? body : jsonEncode(body ?? {}),
           )

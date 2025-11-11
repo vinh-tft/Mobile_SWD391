@@ -1,0 +1,28 @@
+# Add these dependencies to pubspec.yaml for Chat & Video Call
+
+dependencies:
+  # For WebSocket/Real-time chat
+  web_socket_channel: ^2.4.0
+  
+  # For video calls - Azure Communication Services
+  # Note: azure_communication_calling is not available for Flutter
+  # Alternative solutions:
+  
+  # Option 1: Agora (Recommended for Flutter)
+  agora_rtc_engine: ^6.3.0
+  
+  # Option 2: WebRTC directly
+  flutter_webrtc: ^0.9.48
+  
+  # Option 3: 100ms (Good alternative)
+  hmssdk_flutter: ^1.9.0
+  
+  # For permissions
+  permission_handler: ^11.0.1
+
+# Recommended: Use Agora for easiest integration
+# 1. Sign up at https://console.agora.io/
+# 2. Get App ID
+# 3. Follow integration guide
+
+
