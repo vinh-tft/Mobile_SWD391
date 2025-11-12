@@ -73,7 +73,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         centerTitle: true,
         title: Text(
-          'Đăng ký tài khoản',
+          'Register Account',
           style: TextStyle(
             color: AuthTheme.neutralStrong,
             fontSize: 18,
@@ -123,7 +123,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             _buildTermsCheckbox(),
                             const SizedBox(height: 24),
                             _buildPrimaryButton(
-                              label: 'Đăng ký',
+                              label: 'Register',
                               onPressed: _agreeToTerms ? _handleRegister : null,
                               loading: _isLoading,
                             ),
@@ -241,7 +241,7 @@ class _RegisterPageState extends State<RegisterPage> {
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
-            'Bắt đầu hành trình cùng Green Loop',
+            'Start your journey with Green Loop',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -251,7 +251,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         const SizedBox(height: 18),
         Text(
-          'Tạo tài khoản mới',
+          'Create New Account',
           style: TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.w800,
@@ -262,7 +262,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         const SizedBox(height: 10),
         Text(
-          'Đăng ký để bán quần áo lấy điểm và mua sắm bền vững',
+          'Register to sell clothes for points and shop sustainably',
           style: TextStyle(
             fontSize: 15,
             color: AuthTheme.neutral,
@@ -281,14 +281,14 @@ class _RegisterPageState extends State<RegisterPage> {
         TextFormField(
           controller: _usernameController,
           decoration: AuthTheme.inputDecoration(
-            label: 'Tên người dùng',
-            hint: 'Nhập username',
+            label: 'Username',
+            hint: 'Enter username',
             leading:
                 Icon(Icons.alternate_email, color: AuthTheme.primary),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Vui lòng nhập username';
+              return 'Please enter username';
             }
             return null;
           },
@@ -297,13 +297,13 @@ class _RegisterPageState extends State<RegisterPage> {
         TextFormField(
           controller: _firstNameController,
           decoration: AuthTheme.inputDecoration(
-            label: 'Tên',
-            hint: 'Nhập tên',
+            label: 'First Name',
+            hint: 'Enter first name',
             leading: Icon(Icons.badge_outlined, color: AuthTheme.primary),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Vui lòng nhập tên';
+              return 'Please enter first name';
             }
             return null;
           },
@@ -312,8 +312,8 @@ class _RegisterPageState extends State<RegisterPage> {
         TextFormField(
           controller: _lastNameController,
           decoration: AuthTheme.inputDecoration(
-            label: 'Họ và tên đệm',
-            hint: 'Nhập họ và tên đệm',
+            label: 'Last Name',
+            hint: 'Enter last name',
             leading: Icon(Icons.perm_identity, color: AuthTheme.primary),
           ),
         ),
@@ -321,16 +321,16 @@ class _RegisterPageState extends State<RegisterPage> {
         TextFormField(
           controller: _nameController,
           decoration: AuthTheme.inputDecoration(
-            label: 'Họ và tên',
-            hint: 'Nhập họ tên của bạn',
+            label: 'Full Name',
+            hint: 'Enter your full name',
             leading: Icon(Icons.person_outline, color: AuthTheme.primary),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Vui lòng nhập họ tên';
+              return 'Please enter full name';
             }
             if (value.length < 2) {
-              return 'Họ tên phải có ít nhất 2 ký tự';
+              return 'Full name must be at least 2 characters';
             }
             return null;
           },
@@ -340,8 +340,8 @@ class _RegisterPageState extends State<RegisterPage> {
           controller: _phoneController,
           keyboardType: TextInputType.phone,
           decoration: AuthTheme.inputDecoration(
-            label: 'Số điện thoại',
-            hint: 'Nhập số điện thoại',
+            label: 'Phone Number',
+            hint: 'Enter phone number',
             leading: Icon(Icons.phone_outlined, color: AuthTheme.primary),
           ),
         ),
@@ -350,8 +350,8 @@ class _RegisterPageState extends State<RegisterPage> {
           controller: _dobController,
           readOnly: true,
           decoration: AuthTheme.inputDecoration(
-            label: 'Ngày sinh',
-            hint: 'Chọn ngày sinh',
+            label: 'Date of Birth',
+            hint: 'Select date of birth',
             leading: Icon(Icons.cake_outlined, color: AuthTheme.primary),
             trailing: Icon(Icons.calendar_today_outlined,
                 color: AuthTheme.neutral),
@@ -374,12 +374,12 @@ class _RegisterPageState extends State<RegisterPage> {
         DropdownButtonFormField<String>(
           value: _gender,
           items: const [
-            DropdownMenuItem(value: 'MALE', child: Text('Nam')),
-            DropdownMenuItem(value: 'FEMALE', child: Text('Nữ')),
-            DropdownMenuItem(value: 'OTHER', child: Text('Khác')),
+            DropdownMenuItem(value: 'MALE', child: Text('Male')),
+            DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
+            DropdownMenuItem(value: 'OTHER', child: Text('Other')),
           ],
           decoration: AuthTheme.inputDecoration(
-            label: 'Giới tính',
+            label: 'Gender',
             leading: Icon(Icons.wc, color: AuthTheme.primary),
           ),
           onChanged: (v) => setState(() => _gender = v),
@@ -390,15 +390,15 @@ class _RegisterPageState extends State<RegisterPage> {
           keyboardType: TextInputType.emailAddress,
           decoration: AuthTheme.inputDecoration(
             label: 'Email',
-            hint: 'Nhập email của bạn',
+            hint: 'Enter your email',
             leading: Icon(Icons.email_outlined, color: AuthTheme.primary),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Vui lòng nhập email';
+              return 'Please enter email';
             }
             if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-              return 'Email không hợp lệ';
+              return 'Invalid email format';
             }
             return null;
           },
@@ -408,8 +408,8 @@ class _RegisterPageState extends State<RegisterPage> {
           controller: _passwordController,
           obscureText: !_isPasswordVisible,
           decoration: AuthTheme.inputDecoration(
-            label: 'Mật khẩu',
-            hint: 'Nhập mật khẩu của bạn',
+            label: 'Password',
+            hint: 'Enter your password',
             leading: Icon(Icons.lock_outline, color: AuthTheme.primary),
             trailing: IconButton(
               icon: Icon(
@@ -425,10 +425,10 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Vui lòng nhập mật khẩu';
+              return 'Please enter password';
             }
             if (value.length < 6) {
-              return 'Mật khẩu phải có ít nhất 6 ký tự';
+              return 'Password must be at least 6 characters';
             }
             return null;
           },
@@ -438,8 +438,8 @@ class _RegisterPageState extends State<RegisterPage> {
           controller: _confirmPasswordController,
           obscureText: !_isConfirmPasswordVisible,
           decoration: AuthTheme.inputDecoration(
-            label: 'Xác nhận mật khẩu',
-            hint: 'Nhập lại mật khẩu',
+            label: 'Confirm Password',
+            hint: 'Re-enter password',
             leading: Icon(Icons.lock_outline, color: AuthTheme.primary),
             trailing: IconButton(
               icon: Icon(
@@ -457,10 +457,10 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Vui lòng xác nhận mật khẩu';
+              return 'Please confirm password';
             }
             if (value != _passwordController.text) {
-              return 'Mật khẩu không khớp';
+              return 'Passwords do not match';
             }
             return null;
           },
@@ -491,20 +491,20 @@ class _RegisterPageState extends State<RegisterPage> {
         _buildAgreementRow(
           value: _agreeToTerms,
           onChanged: (value) => setState(() => _agreeToTerms = value ?? false),
-          label: 'Tôi đồng ý với Điều khoản sử dụng',
+          label: 'I agree to the Terms of Service',
           required: true,
         ),
         _buildAgreementRow(
           value: _agreeToPrivacy,
           onChanged: (value) =>
               setState(() => _agreeToPrivacy = value ?? false),
-          label: 'Tôi đồng ý với Chính sách bảo mật',
+          label: 'I agree to the Privacy Policy',
         ),
         _buildAgreementRow(
           value: _marketingConsent,
           onChanged: (value) =>
               setState(() => _marketingConsent = value ?? false),
-          label: 'Tôi đồng ý nhận thông tin khuyến mãi',
+          label: 'I agree to receive promotional information',
         ),
       ],
     );
@@ -514,7 +514,7 @@ class _RegisterPageState extends State<RegisterPage> {
     return Column(
       children: [
         Text(
-          'Đã có tài khoản?',
+          'Already have an account?',
           style: AuthTheme.subtitle(),
         ),
         const SizedBox(height: 8),
@@ -532,7 +532,7 @@ class _RegisterPageState extends State<RegisterPage> {
               fontWeight: FontWeight.w700,
             ),
           ),
-          child: const Text('Đăng nhập ngay'),
+          child: const Text('Login Now'),
         ),
       ],
     );
@@ -590,7 +590,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Vui lòng đồng ý với điều khoản sử dụng'),
+          content: Text('Please agree to the terms of service'),
           backgroundColor: AuthTheme.destructive,
         ),
       );
@@ -683,12 +683,12 @@ class _RegisterPageState extends State<RegisterPage> {
       // Hiển thị thông báo thành công
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Đăng ký thành công! Vui lòng đăng nhập'),
+          content: Text('Registration successful! Please login'),
           backgroundColor: AuthTheme.primary,
         ),
       );
 
-      // Chuyển về trang đăng nhập
+      // Navigate to login page
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoginPage()),

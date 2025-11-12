@@ -1,124 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
-import '../services/points_service.dart';
-import '../services/items_service.dart';
-import '../services/clothing_service.dart';
-import '../models/transaction.dart';
-import '../models/api_models.dart';
+import '../services/cart_service.dart';
+import '../services/api_client.dart';
+import '../theme/app_colors.dart';
 
 class CheckoutPage extends StatefulWidget {
-  final Map<String, dynamic> product;
-  final int quantity;
-
-  const CheckoutPage({
-    super.key,
-    required this.product,
-    this.quantity = 1,
-  });
+  const CheckoutPage({super.key});
 
   @override
   State<CheckoutPage> createState() => _CheckoutPageState();
 }
 
 class _CheckoutPageState extends State<CheckoutPage> {
-  int _currentStep = 0;
-  final PageController _pageController = PageController();
+  final _formKey = GlobalKey<FormState>();
   
-  // Address form
-  final _addressFormKey = GlobalKey<FormState>();
+  // Delivery info controllers
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
-  final _cityController = TextEditingController();
+  final _cityController = TextEditingController(text: 'TP. Hồ Chí Minh');
   final _districtController = TextEditingController();
   final _wardController = TextEditingController();
-  final _noteController = TextEditingController();
+  final _notesController = TextEditingController();
   
-  // Payment
-  String _selectedPaymentMethod = 'cod';
-  bool _agreeToTerms = false;
+  bool _isLoading = false;
+  bool _editing = false;
   
-  // Delivery options
-  String _selectedDelivery = 'standard';
-  
-  final List<Map<String, dynamic>> _deliveryOptions = [
-    {
-      'id': 'standard',
-      'name': 'Giao hàng tiêu chuẩn',
-      'description': '3-5 ngày làm việc',
-      'price': 0,
-      'icon': Icons.local_shipping,
-    },
-    {
-      'id': 'express',
-      'name': 'Giao hàng nhanh',
-      'description': '1-2 ngày làm việc',
-      'price': 50000,
-      'icon': Icons.flash_on,
-    },
-    {
-      'id': 'same_day',
-      'name': 'Giao trong ngày',
-      'description': 'Trong ngày (nếu đặt trước 14h)',
-      'price': 100000,
-      'icon': Icons.schedule,
-    },
-  ];
-
-  final List<Map<String, dynamic>> _paymentMethods = [
-    {
-      'id': 'cod',
-      'name': 'Thanh toán khi nhận hàng (COD)',
-      'description': 'Thanh toán bằng tiền mặt khi nhận hàng',
-      'icon': Icons.money,
-      'fee': 0,
-    },
-    {
-      'id': 'bank_transfer',
-      'name': 'Chuyển khoản ngân hàng',
-      'description': 'Chuyển khoản qua ngân hàng',
-      'icon': Icons.account_balance,
-      'fee': 0,
-    },
-    {
-      'id': 'momo',
-      'name': 'Ví MoMo',
-      'description': 'Thanh toán qua ví điện tử MoMo',
-      'icon': Icons.account_balance_wallet,
-      'fee': 0,
-    },
-    {
-      'id': 'vnpay',
-      'name': 'VNPay',
-      'description': 'Thanh toán qua VNPay',
-      'icon': Icons.payment,
-      'fee': 0,
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
-    // Pre-fill some demo data
-    _nameController.text = 'Nguyễn Văn A';
-    _phoneController.text = '0123456789';
-    _addressController.text = '123 Đường ABC';
-    _cityController.text = 'Hồ Chí Minh';
-    _districtController.text = 'Quận 1';
-    _wardController.text = 'Phường Bến Nghé';
-
-    // Rebuild when users edit to refresh the enabled state of the Continue button
-    void addListener(TextEditingController c) => c.addListener(() => setState(() {}));
-    addListener(_nameController);
-    addListener(_phoneController);
-    addListener(_addressController);
-    addListener(_cityController);
-    addListener(_districtController);
-    addListener(_wardController);
-    addListener(_noteController);
+    // Pre-fill user info
+    final auth = context.read<AuthService>();
+    if (auth.currentUser != null) {
+      _nameController.text = auth.currentUser!.name;
+      _phoneController.text = auth.currentUser!.phone ?? '';
+    }
   }
-
+  
   @override
   void dispose() {
     _nameController.dispose();
@@ -127,478 +46,322 @@ class _CheckoutPageState extends State<CheckoutPage> {
     _cityController.dispose();
     _districtController.dispose();
     _wardController.dispose();
-    _noteController.dispose();
-    _pageController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
-  String _formatCurrency(int amount) {
-    return amount.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]}.',
-    );
+  int _calculateTotal(CartService cart) {
+    return cart.totalPoints;
+  }
+
+  bool _validateDeliveryInfo() {
+    if (_nameController.text.trim().isEmpty) {
+      _showErrorDialog('Please enter full name');
+      return false;
+    }
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty || !RegExp(r'^0\d{9}$').hasMatch(phone)) {
+      _showErrorDialog('Please enter a valid phone number (10 digits, starting with 0)');
+      return false;
+    }
+    if (_addressController.text.trim().isEmpty) {
+      _showErrorDialog('Please enter delivery address');
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _handleConfirmOrder() async {
+    final cart = context.read<CartService>();
+    final auth = context.read<AuthService>();
+    
+    if (cart.isEmpty) {
+      Navigator.pop(context);
+      return;
+    }
+    
+    // Validate delivery info
+    if (!_validateDeliveryInfo()) {
+      return;
+    }
+
+    final totalAmount = _calculateTotal(cart);
+    final userPoints = auth.currentUser?.points ?? 0;
+
+    // Check point balance
+    if (userPoints < totalAmount) {
+      _showInsufficientModalDialog();
+      return;
+    }
+
+    try {
+      setState(() => _isLoading = true);
+      
+      final api = context.read<ApiClient>();
+      
+      // Build order request
+      final orderData = {
+        'buyerId': auth.currentUser!.id,
+        'items': cart.items.map((item) => {
+          'itemId': item.itemId,
+          'quantity': item.quantity,
+          'unitPrice': item.pointValue,
+          'discount': 0,
+          'tax': 0,
+        }).toList(),
+        'shippingAddress': '${_addressController.text.trim()}, ${_wardController.text.trim()}, ${_districtController.text.trim()}, ${_cityController.text.trim()}',
+        'notes': _notesController.text.trim().isNotEmpty 
+            ? _notesController.text.trim() 
+            : 'Đơn hàng từ marketplace',
+      };
+
+      final response = await api.post('/api/orders/checkout', body: orderData);
+      
+      // Clear cart
+      cart.clear();
+      
+      // Refresh user points
+      await auth.refreshPoints();
+      
+      if (mounted) {
+        final orders = response is List ? response : (response['data'] ?? []);
+        final orderCount = orders is List ? orders.length : 1;
+        
+        _showSuccessDialog(orderCount);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog('Unable to complete order. Please try again.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          'Thanh toán',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1F2937),
-          ),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1F2937),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Progress indicator
-            _buildProgressIndicator(),
-            
-            // Content
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentStep = index;
-                  });
-                },
-                children: [
-                  _buildAddressStep(),
-                  _buildDeliveryStep(),
-                  _buildPaymentStep(),
-                  _buildConfirmationStep(),
-                ],
-              ),
+      backgroundColor: AppColors.background,
+      body: Consumer2<CartService, AuthService>(
+        builder: (context, cart, auth, _) {
+          if (cart.isEmpty) {
+            // Redirect to cart if empty
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Navigator.pop(context);
+            });
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final totalAmount = _calculateTotal(cart);
+          final userPoints = auth.currentUser?.points ?? 0;
+          final shippingFee = 0; // Free shipping
+          final finalTotal = totalAmount + shippingFee;
+
+          return SafeArea(
+            child: Column(
+              children: [
+                // Header - Match React FE
+                _buildHeader(),
+                // Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth > 768;
+                        
+                        if (isWide) {
+                          // Desktop/Tablet: Side-by-side layout - Match React FE
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Left Column - Delivery & Items - Match React FE: lg:col-span-2
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  children: [
+                                    _buildDeliveryCard(),
+                                    const SizedBox(height: 24),
+                                    _buildCartItemsCard(cart),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 24),
+                              // Right Column - Order Summary - Match React FE: lg:col-span-1
+                              SizedBox(
+                                width: constraints.maxWidth * 0.33,
+                                child: _buildOrderSummary(cart, auth, finalTotal, userPoints),
+                              ),
+                            ],
+                          );
+                        } else {
+                          // Mobile: Stacked layout
+                          return Column(
+                            children: [
+                              _buildDeliveryCard(),
+                              const SizedBox(height: 24),
+                              _buildCartItemsCard(cart),
+                              const SizedBox(height: 24),
+                              _buildOrderSummary(cart, auth, finalTotal, userPoints),
+                            ],
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
-            
-            // Bottom navigation
-            _buildBottomNavigation(),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildProgressIndicator() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          _buildProgressStep(0, 'Địa chỉ', Icons.location_on),
-          _buildProgressLine(),
-          _buildProgressStep(1, 'Giao hàng', Icons.local_shipping),
-          _buildProgressLine(),
-          _buildProgressStep(2, 'Thanh toán', Icons.payment),
-          _buildProgressLine(),
-          _buildProgressStep(3, 'Xác nhận', Icons.check_circle),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressStep(int step, String title, IconData icon) {
-    final isActive = _currentStep >= step;
-    final isCompleted = _currentStep > step;
+  void _showInsufficientModalDialog() {
+    final cart = context.read<CartService>();
+    final auth = context.read<AuthService>();
     
-    return Expanded(
+    showModalBottomSheet(
+      context: context,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildInsufficientModal(cart, auth),
+    );
+  }
+
+  // Header - Match React FE
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        border: Border(
+          bottom: BorderSide(color: AppColors.border),
+        ),
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: isActive ? const Color(0xFF22C55E) : const Color(0xFFE5E7EB),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isCompleted ? Icons.check : icon,
-              color: isActive ? Colors.white : const Color(0xFF6B7280),
-              size: 20,
+          // Title - Match React FE: text-3xl font-bold
+          Text(
+            'Confirm Order',
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.bold,
+              color: AppColors.foreground,
             ),
           ),
           const SizedBox(height: 8),
+          // Description - Match React FE: text-muted-foreground
           Text(
-            title,
+            'Review information before placing order',
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              color: isActive ? const Color(0xFF22C55E) : const Color(0xFF6B7280),
+              fontSize: 14,
+              color: AppColors.mutedForeground,
             ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildProgressLine() {
+  // Delivery Information Card - Match React FE
+  Widget _buildDeliveryCard() {
     return Container(
-      height: 2,
-      width: 20,
-      color: _currentStep > 0 ? const Color(0xFF22C55E) : const Color(0xFFE5E7EB),
-    );
-  }
-
-  Widget _buildAddressStep() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Form(
-        key: _addressFormKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            const Text(
-              'Thông tin giao hàng',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1F2937),
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            // Contact info
-            _buildSectionTitle('Thông tin liên hệ'),
-            _buildTextField(
-              controller: _nameController,
-              label: 'Họ và tên',
-              hint: 'Nhập họ và tên người nhận',
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Vui lòng nhập họ và tên';
-                }
-                return null;
-              },
-            ),
-            _buildTextField(
-              controller: _phoneController,
-              label: 'Số điện thoại',
-              hint: 'Nhập số điện thoại',
-              keyboardType: TextInputType.phone,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Vui lòng nhập số điện thoại';
-                }
-                if (value.length < 10) {
-                  return 'Số điện thoại không hợp lệ';
-                }
-                return null;
-              },
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Address info
-            _buildSectionTitle('Địa chỉ giao hàng'),
-            _buildTextField(
-              controller: _addressController,
-              label: 'Địa chỉ chi tiết',
-              hint: 'Số nhà, tên đường',
-              maxLines: 2,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Vui lòng nhập địa chỉ chi tiết';
-                }
-                return null;
-              },
-            ),
-            
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField(
-                    controller: _cityController,
-                    label: 'Tỉnh/Thành phố',
-                    hint: 'Chọn tỉnh/thành phố',
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Vui lòng chọn tỉnh/thành phố';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildTextField(
-                    controller: _districtController,
-                    label: 'Quận/Huyện',
-                    hint: 'Chọn quận/huyện',
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Vui lòng chọn quận/huyện';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ],
-            ),
-            
-            _buildTextField(
-              controller: _wardController,
-              label: 'Phường/Xã',
-              hint: 'Chọn phường/xã',
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Vui lòng chọn phường/xã';
-                }
-                return null;
-              },
-            ),
-            
-            _buildTextField(
-              controller: _noteController,
-              label: 'Ghi chú (tùy chọn)',
-              hint: 'Ghi chú thêm cho đơn hàng',
-              maxLines: 3,
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Save address option
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.save,
-                    color: const Color(0xFF22C55E),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Lưu địa chỉ này cho lần mua tiếp theo',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF1F2937),
-                      ),
-                    ),
-                  ),
-                  Switch(
-                    value: true,
-                    onChanged: (value) {},
-                    activeColor: const Color(0xFF22C55E),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
       ),
-    );
-  }
-
-  Widget _buildDeliveryStep() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Phương thức giao hàng',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-            ),
-          ),
-          const SizedBox(height: 20),
-          
-          ..._deliveryOptions.map((option) => _buildDeliveryOption(option)).toList(),
-          
-          const SizedBox(height: 20),
-          
-          // Delivery info
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.3)),
-            ),
+          // Header with Edit button - Match React FE
+          Padding(
+            padding: const EdgeInsets.all(20),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(
-                  Icons.info_outline,
-                  color: const Color(0xFF22C55E),
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Thời gian giao hàng có thể thay đổi tùy theo tình hình thực tế',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF1F2937),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDeliveryOption(Map<String, dynamic> option) {
-    final isSelected = _selectedDelivery == option['id'];
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _selectedDelivery = option['id'];
-          });
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFF0FDF4) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected ? const Color(0xFF22C55E) : const Color(0xFFE5E7EB),
-              width: isSelected ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF22C55E) : const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  option['icon'],
-                  color: isSelected ? Colors.white : const Color(0xFF6B7280),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
                   children: [
+                    Icon(Icons.location_on, color: AppColors.primary, size: 20),
+                    const SizedBox(width: 8),
                     Text(
-                      option['name'],
+                      'Delivery Information',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isSelected ? const Color(0xFF22C55E) : const Color(0xFF1F2937),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      option['description'],
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF6B7280),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.foreground,
                       ),
                     ),
                   ],
                 ),
-              ),
-              if ((option['price'] as int) > 0)
-                Text(
-                  '+${_formatCurrency(option['price'] as int)} VND',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isSelected ? const Color(0xFF22C55E) : const Color(0xFF1F2937),
-                  ),
-                )
-              else
-                const Text(
-                  'Miễn phí',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF22C55E),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentStep() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Phương thức thanh toán',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-            ),
-          ),
-          const SizedBox(height: 20),
-          
-          ..._paymentMethods.map((method) => _buildPaymentMethod(method)).toList(),
-          
-          const SizedBox(height: 20),
-          
-          // Terms and conditions
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Checkbox(
-                  value: _agreeToTerms,
-                  onChanged: (value) {
-                    setState(() {
-                      _agreeToTerms = value ?? false;
-                    });
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() => _editing = !_editing);
                   },
-                  activeColor: const Color(0xFF22C55E),
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Tôi đồng ý với các điều khoản và điều kiện của Green Loop',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF1F2937),
-                    ),
+                  icon: Icon(
+                    _editing ? Icons.close : Icons.edit,
+                    size: 16,
+                  ),
+                  label: Text(_editing ? 'Cancel' : 'Edit'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.foreground,
                   ),
                 ),
               ],
+            ),
+          ),
+          Divider(height: 1, color: AppColors.border),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: _editing ? _buildDeliveryForm() : _buildDeliveryView(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Delivery Form - Match React FE editing mode
+  Widget _buildDeliveryForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildFormField('Full Name *', _nameController, Icons.person_outline),
+          const SizedBox(height: 16),
+          _buildFormField('Phone Number *', _phoneController, Icons.phone_outlined,
+              keyboardType: TextInputType.phone, maxLength: 10),
+          const SizedBox(height: 16),
+          _buildFormField('Address *', _addressController, Icons.home_outlined),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: _buildFormField('Ward/Commune', _wardController, Icons.location_city)),
+              const SizedBox(width: 16),
+              Expanded(child: _buildFormField('District', _districtController, Icons.map_outlined)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildFormField('Notes', _notesController, Icons.note_outlined, maxLines: 3),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                setState(() => _editing = false);
+              },
+              icon: const Icon(Icons.check, size: 16),
+              label: const Text('Save Information'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
             ),
           ),
         ],
@@ -606,422 +369,426 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  Widget _buildPaymentMethod(Map<String, dynamic> method) {
-    final isSelected = _selectedPaymentMethod == method['id'];
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _selectedPaymentMethod = method['id'];
-          });
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFF0FDF4) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected ? const Color(0xFF22C55E) : const Color(0xFFE5E7EB),
-              width: isSelected ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF22C55E) : const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  method['icon'],
-                  color: isSelected ? Colors.white : const Color(0xFF6B7280),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      method['name'],
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isSelected ? const Color(0xFF22C55E) : const Color(0xFF1F2937),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      method['description'],
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if ((method['fee'] as int) > 0)
-                Text(
-                  '+${_formatCurrency(method['fee'] as int)} VND',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isSelected ? const Color(0xFF22C55E) : const Color(0xFF1F2937),
-                  ),
-                ),
-            ],
-          ),
+  // Delivery View - Match React FE view mode
+  Widget _buildDeliveryView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildDeliveryInfoRow('Recipient', _nameController.text.isNotEmpty ? _nameController.text : 'Not updated'),
+        const SizedBox(height: 12),
+        _buildDeliveryInfoRow('Phone Number', _phoneController.text.isNotEmpty ? _phoneController.text : 'Not updated'),
+        const SizedBox(height: 12),
+        _buildDeliveryInfoRow(
+          'Address',
+          _addressController.text.isNotEmpty
+              ? '${_addressController.text}, ${_wardController.text}, ${_districtController.text}, ${_cityController.text}'
+              : 'Not updated',
         ),
-      ),
+        if (_notesController.text.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildDeliveryInfoRow('Notes', _notesController.text),
+        ],
+      ],
     );
   }
 
-  Widget _buildConfirmationStep() {
-    final deliveryOption = _deliveryOptions.firstWhere((option) => option['id'] == _selectedDelivery);
-    final paymentMethod = _paymentMethods.firstWhere((method) => method['id'] == _selectedPaymentMethod);
-    final productPrice = int.parse(widget.product['price'].replaceAll(RegExp(r'[^\d]'), ''));
-    final totalPrice = productPrice + (deliveryOption['price'] as int) + (paymentMethod['fee'] as int);
-    
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+  Widget _buildDeliveryInfoRow(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: AppColors.mutedForeground,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: AppColors.foreground,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormField(String label, TextEditingController controller, IconData icon,
+      {TextInputType keyboardType = TextInputType.text, int maxLines = 1, int? maxLength}) {
+    final isRequired = label.contains('*');
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      maxLength: maxLength,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, size: 18),
+        filled: true,
+        fillColor: AppColors.input,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.primary, width: 2),
+        ),
+      ),
+      validator: isRequired
+          ? (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter ${label.replaceAll('*', '').trim()}';
+              }
+              if (label.contains('Phone Number') && !RegExp(r'^0\d{9}$').hasMatch(value.trim())) {
+                return 'Invalid phone number';
+              }
+              return null;
+            }
+          : null,
+    );
+  }
+
+  // Cart Items Card - Match React FE
+  Widget _buildCartItemsCard(CartService cart) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Xác nhận đơn hàng',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-            ),
-          ),
-          const SizedBox(height: 20),
-          
-          // Product info
-          _buildSectionTitle('Sản phẩm'),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
+          Padding(
+            padding: const EdgeInsets.all(20),
             child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: (widget.product['images'] is List && (widget.product['images'] as List).isNotEmpty)
-                      ? Image.network(
-                          (widget.product['images'] as List).first,
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            width: 80,
-                            height: 80,
-                            color: const Color(0xFFF3F4F6),
-                            child: const Icon(
-                              Icons.broken_image,
-                              color: Color(0xFF6B7280),
-                              size: 40,
-                            ),
-                          ),
-                        )
-                      : Container(
-                          width: 80,
-                          height: 80,
-                          color: const Color(0xFFF3F4F6),
-                          child: const Icon(
-                            Icons.image,
-                            color: Color(0xFF6B7280),
-                            size: 40,
-                          ),
-                        ),
+                Icon(Icons.shopping_cart, color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Products (${cart.items.length})',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.foreground,
+                  ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppColors.border),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: cart.items.map((item) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.muted.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
                     children: [
-                      Text(
-                        widget.product['title'],
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1F2937),
+                      // Item Image - Match React FE: w-20 h-20
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          color: AppColors.muted,
+                          child: item.imageUrl != null
+                              ? Image.network(
+                                  item.imageUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Icon(
+                                    Icons.shopping_cart_outlined,
+                                    color: AppColors.mutedForeground,
+                                    size: 32,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.shopping_cart_outlined,
+                                  color: AppColors.mutedForeground,
+                                  size: 32,
+                                ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Số lượng: ${widget.quantity}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.product['price'],
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF22C55E),
+                      const SizedBox(width: 16),
+                      // Item Details - Match React FE: flex-1
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.name,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.foreground,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Quantity: ${item.quantity}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.mutedForeground,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${(item.pointValue * item.quantity).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} points',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                );
+              }).toList(),
             ),
           ),
-          
+        ],
+      ),
+    );
+  }
+
+  // Order Summary - Match React FE
+  Widget _buildOrderSummary(CartService cart, AuthService auth, int finalTotal, int userPoints) {
+    final totalAmount = _calculateTotal(cart);
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Title - Match React FE
+          Row(
+            children: [
+              Icon(Icons.credit_card, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Payment',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.foreground,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
-          
-          // Delivery info
-          _buildSectionTitle('Thông tin giao hàng'),
+          // Point Balance - Match React FE: bg-primary/10
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Người nhận: ${_nameController.text}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'SĐT: ${_phoneController.text}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Địa chỉ: ${_addressController.text}, ${_wardController.text}, ${_districtController.text}, ${_cityController.text}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      deliveryOption['icon'],
-                      color: const Color(0xFF22C55E),
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      deliveryOption['name'],
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF22C55E),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 20),
-          
-          // Payment summary
-          _buildSectionTitle('Tổng thanh toán'),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Column(
-              children: [
-                _buildPriceRow('Giá sản phẩm', widget.product['price']),
-                _buildPriceRow('Phí giao hàng', (deliveryOption['price'] as int) > 0 ? '+${_formatCurrency(deliveryOption['price'] as int)} VND' : 'Miễn phí'),
-                if ((paymentMethod['fee'] as int) > 0)
-                  _buildPriceRow('Phí thanh toán', '+${_formatCurrency(paymentMethod['fee'] as int)} VND'),
-                const Divider(),
-                _buildPriceRow('Tổng cộng', '${_formatCurrency(totalPrice)} VND', isTotal: true),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF1F2937),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    TextInputType? keyboardType,
-    int maxLines = 1,
-    String? Function(String?)? validator,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: controller,
-            keyboardType: keyboardType,
-            maxLines: maxLines,
-            validator: validator,
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: const TextStyle(
-                color: Color(0xFF6B7280),
-                fontSize: 14,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Colors.red),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPriceRow(String label, String price, {bool isTotal = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: isTotal ? 16 : 14,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              color: const Color(0xFF1F2937),
-            ),
-          ),
-          Text(
-            price,
-            style: TextStyle(
-              fontSize: isTotal ? 18 : 14,
-              fontWeight: FontWeight.bold,
-              color: isTotal ? const Color(0xFF22C55E) : const Color(0xFF1F2937),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNavigation() {
-    return Container(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 16,
-        bottom: MediaQuery.of(context).padding.bottom + 16,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-      ),
-      child: Row(
-        children: [
-          if (_currentStep > 0)
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _previousStep,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: const BorderSide(color: Color(0xFF22C55E)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Quay lại',
+                  'Your Point Balance',
                   style: TextStyle(
-                    color: Color(0xFF22C55E),
-                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: AppColors.mutedForeground,
                   ),
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  '${userPoints.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} points',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Price Summary - Match React FE: border-t pt-4
+          Divider(color: AppColors.border),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Subtotal',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.mutedForeground,
+                ),
+              ),
+              Text(
+                '${totalAmount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} points',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.foreground,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Shipping Fee',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.mutedForeground,
+                ),
+              ),
+              Text(
+                'Free',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.success,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Divider(color: AppColors.border),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.foreground,
+                ),
+              ),
+              Text(
+                '${finalTotal.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} points',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Point Check Warning - Match React FE
+          if (userPoints < finalTotal)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.destructive.withOpacity(0.1),
+                border: Border.all(color: AppColors.destructive.withOpacity(0.2)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: AppColors.destructive, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Insufficient Points',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.destructive,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'You need ${(finalTotal - userPoints).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} more points',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.mutedForeground,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          if (_currentStep > 0) const SizedBox(width: 16),
-          Expanded(
-            flex: _currentStep == 0 ? 1 : 2,
+          if (userPoints < finalTotal) const SizedBox(height: 20),
+          // Confirm Button - Match React FE
+          SizedBox(
+            width: double.infinity,
             child: ElevatedButton(
-              onPressed: _canProceed() ? _nextStep : null,
+              onPressed: _isLoading ? null : _handleConfirmOrder,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF22C55E),
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: userPoints >= finalTotal ? AppColors.primary : AppColors.muted,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
+                disabledBackgroundColor: AppColors.muted,
               ),
-              child: Text(
-                _currentStep == 3 ? 'Đặt hàng' : 'Tiếp tục',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: _isLoading
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('Processing...'),
+                      ],
+                    )
+                  : Text(
+                      userPoints >= finalTotal ? 'Confirm Order' : 'Insufficient Points',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Footer text - Match React FE
+          Center(
+            child: Text(
+              'By placing an order, you agree to the terms of service',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.mutedForeground,
               ),
+              textAlign: TextAlign.center,
             ),
           ),
         ],
@@ -1029,129 +796,166 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  bool _canProceed() {
-    switch (_currentStep) {
-      case 0:
-        return _addressFormKey.currentState?.validate() ?? false;
-      case 1:
-        return _selectedDelivery.isNotEmpty;
-      case 2:
-        return _selectedPaymentMethod.isNotEmpty && _agreeToTerms;
-      case 3:
-        return true;
-      default:
-        return false;
-    }
-  }
-
-  void _nextStep() {
-    if (_currentStep < 3) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    } else {
-      _placeOrder();
-    }
-  }
-
-  void _previousStep() {
-    if (_currentStep > 0) {
-      _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-
-  void _placeOrder() async {
-    // Lấy context provider
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final pointsService = Provider.of<PointsService>(context, listen: false);
-    final itemsService = Provider.of<ItemsService>(context, listen: false);
-    final clothingService = Provider.of<ClothingService>(context, listen: false);
-    final user = authService.currentUser;
+  // Insufficient Points Modal - Match React FE
+  Widget _buildInsufficientModal(CartService cart, AuthService auth) {
+    final totalAmount = _calculateTotal(cart);
+    final userPoints = auth.currentUser?.points ?? 0;
+    final finalTotal = totalAmount;
     
-    final productPrice = int.tryParse(widget.product['price']?.replaceAll(RegExp(r'[^0-9]'), '') ?? '') ?? 0;
-    // Lấy itemId từ props truyền vào product (nên sửa source từ marketplace truyền cả itemId sang)
-    final String? itemId = widget.product['itemId'] ?? null;
-
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Không tìm thấy thông tin người dùng'), backgroundColor: Colors.red));
-      return;
-    }
-    if (user.points < productPrice) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Bạn không đủ điểm để mua sản phẩm này!'), backgroundColor: Colors.red));
-      return;
-    }
-    if (itemId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Thiếu mã sản phẩm!'), backgroundColor: Colors.red));
-      return;
-    }
-    
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF22C55E))),
-      ),
-    );
-    try {
-      // Trừ điểm user (API, backend sẽ lưu lịch sử transaction thực)
-      final pointSuccess = await pointsService.adjustPoints(userId: user.id, amount: -productPrice, reason: 'buy_item');
-      if (!pointSuccess) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Giao dịch thất bại khi trừ điểm!'), backgroundColor: Colors.red));
-        return;
-      }
-      // Đánh dấu item SOLD (API)
-      final soldSuccess = await itemsService.updateItemStatus(itemId, ItemStatus.SOLD);
-      if (!soldSuccess) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Không thể cập nhật trạng thái sản phẩm!'), backgroundColor: Colors.red));
-        return;
-      }
-      // Lưu transaction local (nếu muốn demo) hoặc backend sẽ có
-      clothingService.createTransaction(Transaction(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        customerId: user.id,
-        staffId: null,
-        type: TransactionType.buy,
-        status: TransactionStatus.completed,
-        clothingItemIds: [itemId],
-        totalPoints: productPrice,
-        notes: 'Khách mua hàng',
-        createdAt: DateTime.now(),
-        completedAt: DateTime.now(),
-      ));
-      // Đặt hàng thành công
-      Navigator.pop(context); // Close loading
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 32),
-              SizedBox(width: 12),
-              Text('Đặt hàng thành công!'),
-            ],
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
           ),
-          content: const Text('Đơn hàng của bạn đã được xác nhận. Chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Go back to marketplace
-              },
-              child: const Text('OK', style: TextStyle(color: Color(0xFF22C55E), fontWeight: FontWeight.bold)),
+        ],
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: AppColors.destructive, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  'Insufficient Points for Payment',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.destructive,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'You need ${finalTotal.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} points to complete this order.',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.mutedForeground,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Current balance: ${userPoints.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} points',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.mutedForeground,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Shortage: ${(finalTotal - userPoints).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} points',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.destructive,
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text('Close'),
+              ),
             ),
           ],
         ),
-      );
-    } catch (e) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red));
-    }
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(int orderCount) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.primary,
+                size: 64,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Order Placed Successfully!',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: AppColors.foreground,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$orderCount order(s) have been created.',
+              style: TextStyle(
+                fontSize: 15,
+                color: AppColors.mutedForeground,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Close checkout
+                // Navigate to orders page if exists, otherwise go to home
+                Navigator.popUntil(context, (route) => route.isFirst);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Complete'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
+

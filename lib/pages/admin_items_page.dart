@@ -1,11 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/items_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../models/api_models.dart';
-import 'create_listing_page.dart';
-import 'product_detail_page.dart';
+import 'admin_item_create_page.dart';
+import 'admin_item_detail_page.dart';
 
 class AdminItemsPage extends StatefulWidget {
   const AdminItemsPage({super.key});
@@ -18,53 +19,99 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedStatus = 'all';
   bool _isLoading = false;
+  int _currentPage = 0;
+  int _totalPages = 0;
+  Timer? _searchDebounce;
+  
+  Map<String, int> _stats = {
+    'total': 0,
+    'approved': 0,
+    'pending': 0,
+    'rejected': 0,
+  };
 
   final Map<String, String> _statusFilters = {
-    'all': 'Tất cả',
-    'VERIFIED': 'Đã xác minh',
-    'PENDING_VERIFICATION': 'Chờ xác minh',
-    'DRAFT': 'Nháp',
-    'SOLD': 'Đã bán',
+    'all': 'All',
+    'LISTED': 'Listed',
+    'READY_FOR_SALE': 'Ready for Sale',
+    'SUBMITTED': 'Submitted',
+    'PENDING_COLLECTION': 'Pending Collection',
+    'COLLECTED': 'Collected',
+    'VALUED': 'Valued',
+    'REJECTED': 'Rejected',
   };
 
   @override
   void initState() {
     super.initState();
+    _loadStats();
     _loadItems();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadStats() async {
+    final itemsService = context.read<ItemsService>();
+    final stats = await itemsService.getStatistics();
+    if (mounted) {
+      setState(() {
+        _stats = stats;
+      });
+    }
   }
 
   Future<void> _loadItems() async {
     setState(() => _isLoading = true);
-    await context.read<ItemsService>().loadItems();
-    setState(() => _isLoading = false);
+    final itemsService = context.read<ItemsService>();
+    
+    try {
+      Map<String, dynamic> result;
+      
+      if (_searchController.text.isNotEmpty) {
+        result = await itemsService.searchItemsPaginated(
+          _searchController.text,
+          page: _currentPage,
+          size: 20,
+        );
+      } else if (_selectedStatus != 'all') {
+        result = await itemsService.getItemsByStatusPaginated(
+          _selectedStatus,
+          page: _currentPage,
+          size: 20,
+        );
+      } else {
+        result = await itemsService.loadItemsPaginated(
+          page: _currentPage,
+          size: 20,
+        );
+      }
+      
+      if (mounted) {
+        setState(() {
+          _totalPages = result['totalPages'] ?? 0;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
-  List<ItemSummaryResponse> _getFilteredItems(List<ItemSummaryResponse> items) {
-    var filtered = items;
-
-    // Filter by status
-    if (_selectedStatus != 'all') {
-      filtered = filtered.where((item) => 
-        item.status.toString().split('.').last == _selectedStatus
-      ).toList();
-    }
-
-    // Filter by search
-    if (_searchController.text.isNotEmpty) {
-      final query = _searchController.text.toLowerCase();
-      filtered = filtered.where((item) => 
-        item.name.toLowerCase().contains(query) ||
-        (item.brandName?.toLowerCase().contains(query) ?? false)
-      ).toList();
-    }
-
-    return filtered;
+  void _handleSearchChange(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      setState(() {
+        _currentPage = 0;
+      });
+      _loadItems();
+    });
   }
 
   @override
@@ -79,7 +126,7 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Quản lý sản phẩm',
+          'Manage Products',
           style: TextStyle(
             color: Colors.white,
             fontSize: 20,
@@ -89,11 +136,15 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add, color: Colors.white),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final result = await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const CreateListingPage()),
-              ).then((_) => _loadItems());
+                MaterialPageRoute(builder: (_) => const AdminItemCreatePage()),
+              );
+              if (result == true) {
+                _loadStats();
+                _loadItems();
+              }
             },
           ),
         ],
@@ -101,12 +152,15 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
       body: Consumer<ItemsService>(
         builder: (context, itemsService, _) {
           return RefreshIndicator(
-            onRefresh: _loadItems,
+            onRefresh: () async {
+              await _loadStats();
+              await _loadItems();
+            },
             color: AppColors.primary,
             child: Column(
               children: [
                 // Stats Cards
-                _buildStatsCards(itemsService.items),
+                _buildStatsCards(),
                 
                 // Search and Filter
                 _buildSearchAndFilter(),
@@ -123,31 +177,52 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
     );
   }
 
-  Widget _buildStatsCards(List<ItemSummaryResponse> allItems) {
-    final stats = {
-      'total': allItems.length,
-      'verified': allItems.where((i) => i.status == ItemStatus.VERIFIED).length,
-      'pending': allItems.where((i) => i.status == ItemStatus.PENDING_VERIFICATION).length,
-      'sold': allItems.where((i) => i.status == ItemStatus.SOLD).length,
-    };
-
+  Widget _buildStatsCards() {
     return Container(
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          Expanded(child: _buildStatCard('Tổng số', stats['total']!, Icons.inventory_2, AppColors.primary)),
+          Expanded(
+            child: _buildStatCard(
+              'Tổng số',
+              _stats['total']!.toString(),
+              Icons.inventory_2,
+              AppColors.primary,
+            ),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: _buildStatCard('Đã xác minh', stats['verified']!, Icons.verified, AppColors.success)),
+          Expanded(
+            child: _buildStatCard(
+              'Approved',
+              _stats['approved']!.toString(),
+              Icons.check_circle,
+              AppColors.success,
+            ),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: _buildStatCard('Chờ', stats['pending']!, Icons.pending, AppColors.warning)),
+          Expanded(
+            child: _buildStatCard(
+              'Pending',
+              _stats['pending']!.toString(),
+              Icons.pending,
+              AppColors.warning,
+            ),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: _buildStatCard('Đã bán', stats['sold']!, Icons.check_circle, AppColors.info)),
+          Expanded(
+            child: _buildStatCard(
+              'Rejected',
+              _stats['rejected']!.toString(),
+              Icons.cancel,
+              AppColors.destructive,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String label, int value, IconData icon, Color color) {
+  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -160,7 +235,7 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
           Icon(icon, color: color, size: 20),
           const SizedBox(height: 8),
           Text(
-            '$value',
+            value,
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -175,6 +250,8 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
               color: AppColors.mutedForeground,
             ),
             textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -202,11 +279,11 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
                   child: TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
-                      hintText: 'Tìm kiếm sản phẩm...',
+                      hintText: 'Search products...',
                       hintStyle: TextStyle(color: AppColors.mutedForeground),
                       border: InputBorder.none,
                     ),
-                    onChanged: (_) => setState(() {}),
+                    onChanged: _handleSearchChange,
                   ),
                 ),
                 if (_searchController.text.isNotEmpty)
@@ -214,6 +291,8 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
                     icon: Icon(Icons.clear, color: AppColors.mutedForeground, size: 20),
                     onPressed: () {
                       setState(() => _searchController.clear());
+                      _currentPage = 0;
+                      _loadItems();
                     },
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -222,33 +301,32 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
             ),
           ),
           const SizedBox(height: 12),
-          // Status Filter
-          SizedBox(
-            height: 40,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: _statusFilters.length,
-              itemBuilder: (context, index) {
-                final entry = _statusFilters.entries.elementAt(index);
-                final isSelected = _selectedStatus == entry.key;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(entry.value),
-                    selected: isSelected,
-                    onSelected: (_) {
-                      setState(() => _selectedStatus = entry.key);
-                    },
-                    backgroundColor: AppColors.card,
-                    selectedColor: AppColors.primary,
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : AppColors.foreground,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      fontSize: 13,
-                    ),
-                    side: BorderSide(color: isSelected ? AppColors.primary : AppColors.border),
-                  ),
+          // Status Filter Dropdown
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.input,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: DropdownButton<String>(
+              value: _selectedStatus,
+              isExpanded: true,
+              underline: const SizedBox(),
+              items: _statusFilters.entries.map((entry) {
+                return DropdownMenuItem(
+                  value: entry.key,
+                  child: Text(entry.value),
                 );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedStatus = value;
+                    _currentPage = 0;
+                  });
+                  _loadItems();
+                }
               },
             ),
           ),
@@ -263,19 +341,60 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final filteredItems = _getFilteredItems(itemsService.items);
+    final items = itemsService.items;
 
-    if (filteredItems.isEmpty) {
+    if (items.isEmpty) {
       return _buildEmptyState();
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: filteredItems.length,
-      itemBuilder: (context, index) {
-        final item = filteredItems[index];
-        return _buildItemCard(item);
-      },
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return _buildItemCard(item);
+            },
+          ),
+        ),
+        // Pagination
+        if (_totalPages > 1)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: _currentPage > 0
+                      ? () {
+                          setState(() => _currentPage--);
+                          _loadItems();
+                        }
+                      : null,
+                ),
+                Text(
+                  'Page ${_currentPage + 1} / $_totalPages',
+                  style: TextStyle(color: AppColors.foreground),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: _currentPage < _totalPages - 1
+                      ? () {
+                          setState(() => _currentPage++);
+                          _loadItems();
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -296,28 +415,49 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Image
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    color: AppColors.muted,
-                    child: item.primaryImageUrl != null
-                        ? Image.network(
-                            item.primaryImageUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Icon(
-                              Icons.image,
-                              color: AppColors.mutedForeground,
-                              size: 32,
-                            ),
-                          )
-                        : Icon(
-                            Icons.image,
-                            color: AppColors.mutedForeground,
-                            size: 32,
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        color: AppColors.muted,
+                        child: item.primaryImageUrl != null
+                            ? Image.network(
+                                item.primaryImageUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Icon(
+                                  Icons.image,
+                                  color: AppColors.mutedForeground,
+                                  size: 32,
+                                ),
+                              )
+                            : Icon(
+                                Icons.image,
+                                color: AppColors.mutedForeground,
+                                size: 32,
+                              ),
+                      ),
+                    ),
+                    if (item.isVerified == true)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: AppColors.success,
+                            shape: BoxShape.circle,
                           ),
-                  ),
+                          child: const Icon(
+                            Icons.check_circle,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 16),
                 // Details
@@ -325,55 +465,190 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        item.name,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.foreground,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.displayName ?? item.name,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.foreground,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (item.isVerified == true)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: AppColors.success),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check_circle, size: 12, color: AppColors.success),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Verified',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.success,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 4),
-                      if (item.brandName != null)
-                        Text(
-                          item.brandName!,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.mutedForeground,
-                          ),
-                        ),
-                      const SizedBox(height: 8),
-                      Row(
+                      // Category, Brand, Size, Color
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
-                          _buildStatusBadge(item.status),
-                          const SizedBox(width: 8),
-                          _buildConditionBadge(item.condition),
+                          if (item.categoryName.isNotEmpty)
+                            Text(
+                              item.categoryName,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.mutedForeground,
+                              ),
+                            ),
+                          if (item.brandName != null && item.brandName!.isNotEmpty) ...[
+                            Text('•', style: TextStyle(color: AppColors.mutedForeground, fontSize: 12)),
+                            Text(
+                              item.brandName!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.mutedForeground,
+                              ),
+                            ),
+                          ],
+                          if (item.size.isNotEmpty && item.size != 'N/A') ...[
+                            Text('•', style: TextStyle(color: AppColors.mutedForeground, fontSize: 12)),
+                            Text(
+                              'Size ${item.size}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.mutedForeground,
+                              ),
+                            ),
+                          ],
+                          if (item.color.isNotEmpty && item.color != 'N/A') ...[
+                            Text('•', style: TextStyle(color: AppColors.mutedForeground, fontSize: 12)),
+                            Text(
+                              item.color,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.mutedForeground,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 8),
+                      // Item Code and Condition Score
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          if (item.itemCode != null && item.itemCode!.isNotEmpty)
+                            Text(
+                              'Code: ${item.itemCode}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.mutedForeground,
+                              ),
+                            ),
+                          if (item.conditionScore != null) ...[
+                            Text('•', style: TextStyle(color: AppColors.mutedForeground, fontSize: 11)),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.star, size: 12, color: Colors.amber, fill: 1),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${item.conditionScore!.toStringAsFixed(1)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.mutedForeground,
+                                  ),
+                                ),
+                                if (item.conditionText != null) ...[
+                                  Text(
+                                    ' - ${item.conditionText}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.mutedForeground,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Price and Status Row
                       Row(
                         children: [
-                          Icon(Icons.stars_rounded, color: AppColors.primary, size: 16),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${item.pointValue} điểm',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Est. Value',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.mutedForeground,
+                                  ),
+                                ),
+                                Text(
+                                  '\$${item.currentEstimatedValue?.toStringAsFixed(2) ?? '0.00'}',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                                if (item.resellPrice != null && item.resellPrice! > 0) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Resell Price',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.mutedForeground,
+                                    ),
+                                  ),
+                                  Text(
+                                    '\$${item.resellPrice!.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                          const Spacer(),
-                          Text(
-                            'Size: ${item.size}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.mutedForeground,
-                            ),
-                          ),
+                          const SizedBox(width: 12),
+                          _buildStatusBadge(item.status),
                         ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatDate(item.createdAt),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppColors.mutedForeground,
+                        ),
                       ),
                     ],
                   ),
@@ -395,22 +670,16 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => ProductDetailPage(
-                            title: item.name,
-                            price: '${item.pointValue} điểm',
-                            rating: '4.5',
-                            description: item.description,
-                            images: item.primaryImageUrl != null ? [item.primaryImageUrl!] : [],
-                            seller: item.ownerName,
-                            condition: item.condition.toString().split('.').last,
-                            size: item.size,
-                            brand: item.brandName ?? '',
-                          ),
+                          builder: (context) => AdminItemDetailPage(itemId: item.itemId),
                         ),
-                      );
+                      ).then((_) {
+                        // Reload items after returning from detail page
+                        _loadStats();
+                        _loadItems();
+                      });
                     },
                     icon: const Icon(Icons.visibility, size: 16),
-                    label: const Text('Xem'),
+                    label: const Text('View'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.info,
                       side: BorderSide(color: AppColors.border),
@@ -422,29 +691,25 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      // Edit item
-                      _showEditDialog(item);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AdminItemDetailPage(itemId: item.itemId),
+                        ),
+                      ).then((_) {
+                        // Reload items after returning from detail page
+                        _loadStats();
+                        _loadItems();
+                      });
                     },
                     icon: const Icon(Icons.edit, size: 16),
-                    label: const Text('Sửa'),
+                    label: const Text('Edit'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.warning,
                       side: BorderSide(color: AppColors.border),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton(
-                  onPressed: () {
-                    _showDeleteDialog(item);
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.destructive,
-                    side: BorderSide(color: AppColors.border),
-                    padding: const EdgeInsets.all(12),
-                  ),
-                  child: const Icon(Icons.delete_outline, size: 20),
                 ),
               ],
             ),
@@ -459,25 +724,23 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
     String label;
 
     switch (status) {
-      case ItemStatus.VERIFIED:
+      case ItemStatus.LISTED:
+      case ItemStatus.READY_FOR_SALE:
         color = AppColors.success;
-        label = 'Đã xác minh';
+        label = status.toString().split('.').last.replaceAll('_', ' ');
         break;
-      case ItemStatus.PENDING_VERIFICATION:
+      case ItemStatus.SUBMITTED:
+      case ItemStatus.PENDING_COLLECTION:
         color = AppColors.warning;
-        label = 'Chờ xác minh';
-        break;
-      case ItemStatus.SOLD:
-        color = AppColors.info;
-        label = 'Đã bán';
+        label = status.toString().split('.').last.replaceAll('_', ' ');
         break;
       case ItemStatus.REJECTED:
         color = AppColors.destructive;
-        label = 'Từ chối';
+        label = status.toString().split('.').last.replaceAll('_', ' ');
         break;
       default:
         color = AppColors.mutedForeground;
-        label = 'Nháp';
+        label = status.toString().split('.').last.replaceAll('_', ' ');
     }
 
     return Container(
@@ -485,6 +748,7 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color),
       ),
       child: Text(
         label,
@@ -497,30 +761,13 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
     );
   }
 
-  Widget _buildConditionBadge(ItemCondition condition) {
-    final labels = {
-      ItemCondition.EXCELLENT: 'Xuất sắc',
-      ItemCondition.GOOD: 'Tốt',
-      ItemCondition.FAIR: 'Khá',
-      ItemCondition.POOR: 'Kém',
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.muted,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Text(
-        labels[condition] ?? condition.toString(),
-        style: TextStyle(
-          color: AppColors.mutedForeground,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return dateStr;
+    }
   }
 
   Widget _buildEmptyState() {
@@ -544,7 +791,7 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
             ),
             const SizedBox(height: 20),
             Text(
-              'Không tìm thấy sản phẩm',
+              'No products found',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -553,7 +800,7 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Thử thay đổi bộ lọc hoặc thêm sản phẩm mới',
+              'Try changing filters or add new products',
               style: TextStyle(
                 fontSize: 15,
                 color: AppColors.mutedForeground,
@@ -571,58 +818,16 @@ class _AdminItemsPageState extends State<AdminItemsPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Chỉnh sửa sản phẩm'),
-        content: const Text('Tính năng chỉnh sửa sẽ được phát triển sớm.'),
+        title: const Text('Edit Product'),
+        content: const Text('Edit feature will be developed soon.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
+            child: const Text('Close'),
           ),
         ],
       ),
     );
   }
 
-  void _showDeleteDialog(ItemSummaryResponse item) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber, color: AppColors.destructive),
-            const SizedBox(width: 8),
-            const Text('Xóa sản phẩm'),
-          ],
-        ),
-        content: Text('Bạn có chắc muốn xóa "${item.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              final success = await context.read<ItemsService>().deleteItem(item.itemId);
-              if (success && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Đã xóa sản phẩm'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
-                _loadItems();
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.destructive,
-            ),
-            child: const Text('Xóa'),
-          ),
-        ],
-      ),
-    );
-  }
 }
-

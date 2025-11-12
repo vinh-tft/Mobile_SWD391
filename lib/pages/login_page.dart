@@ -26,7 +26,27 @@ class _LoginPageState extends State<LoginPage> {
   int _resendCooldown = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Listen to auth state changes to auto-navigate when login succeeds
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      authService.addListener(_onAuthStateChanged);
+    });
+  }
+
+  void _onAuthStateChanged() {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    if (authService.isLoggedIn && mounted) {
+      // User logged in successfully, the main app will handle navigation
+      // No need to manually navigate as the auth guard in main.dart will show home page
+    }
+  }
+
+  @override
   void dispose() {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    authService.removeListener(_onAuthStateChanged);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -34,13 +54,21 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AuthTheme.backgroundGradient,
-        ),
-        child: Stack(
+    // Listen to auth state - if logged in, the main app will handle navigation
+    return Consumer<AuthService>(
+      builder: (context, authService, child) {
+        // If user is logged in, don't show login page (main.dart will handle)
+        if (authService.isLoggedIn) {
+          return const SizedBox.shrink(); // Empty widget, main.dart will show home
+        }
+        
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: AuthTheme.backgroundGradient,
+            ),
+            child: Stack(
           children: [
             Positioned(
               top: -120,
@@ -79,12 +107,12 @@ class _LoginPageState extends State<LoginPage> {
                             _buildForgotPassword(),
                             const SizedBox(height: 24),
                             _buildPrimaryButton(
-                              label: 'Đăng nhập',
+                              label: 'Login',
                               onPressed: _handleLogin,
                               loading: _isLoading,
                             ),
                             const SizedBox(height: 24),
-                            _buildDividerLabel('Hoặc tiếp tục với'),
+                            _buildDividerLabel('Or continue with'),
                             const SizedBox(height: 20),
                             const GoogleSignInButton(),
                             const SizedBox(height: 28),
@@ -101,6 +129,8 @@ class _LoginPageState extends State<LoginPage> {
           ],
         ),
       ),
+    );
+      },
     );
   }
 
@@ -258,7 +288,7 @@ class _LoginPageState extends State<LoginPage> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Xác thực email của bạn',
+                            'Verify Your Email',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
@@ -270,7 +300,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Email của bạn chưa được xác thực. Chúng tôi đã gửi liên kết xác thực tới hộp thư của bạn.',
+                      'Your email has not been verified. We have sent a verification link to your inbox.',
                       style: TextStyle(
                         fontSize: 14,
                         color: AuthTheme.neutral,
@@ -338,7 +368,7 @@ class _LoginPageState extends State<LoginPage> {
                           border: Border.all(color: const Color(0xFFFCD34D)),
                         ),
                         child: Text(
-                          'Chưa nhận được email? Nhấn gửi lại để nhận liên kết xác thực cho: ${_emailController.text}',
+                          "Didn't receive the email? Click resend to receive a verification link for: ${_emailController.text}",
                           style: const TextStyle(
                             fontSize: 13,
                             color: Color(0xFF92400E),
@@ -349,8 +379,8 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 20),
                       _buildPrimaryButton(
                         label: _resendCooldown > 0
-                            ? 'Đợi ${_resendCooldown}s để gửi lại'
-                            : 'Gửi lại email xác thực',
+                            ? 'Wait ${_resendCooldown}s to resend'
+                            : 'Resend Verification Email',
                         onPressed: (_resendLoading || _resendCooldown > 0)
                             ? null
                             : _handleResendVerification,
@@ -374,12 +404,12 @@ class _LoginPageState extends State<LoginPage> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        child: const Text('Đóng'),
+                        child: const Text('Close'),
                       ),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Sau khi xác thực thành công, vui lòng thử đăng nhập lại.',
+                      'After successful verification, please try logging in again.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12,
@@ -422,7 +452,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
         const SizedBox(height: 24),
         Text(
-          'Chào mừng trở lại!',
+          'Welcome Back!',
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w800,
@@ -433,7 +463,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
         const SizedBox(height: 10),
         Text(
-          'Đăng nhập để tiếp tục hành trình thời trang bền vững cùng Green Loop',
+          'Login to continue your sustainable fashion journey with Green Loop',
           style: TextStyle(
             fontSize: 15,
             height: 1.5,
@@ -454,15 +484,15 @@ class _LoginPageState extends State<LoginPage> {
           keyboardType: TextInputType.emailAddress,
           decoration: AuthTheme.inputDecoration(
             label: 'Email',
-            hint: 'Nhập email của bạn',
+            hint: 'Enter your email',
             leading: Icon(Icons.email_outlined, color: AuthTheme.primary),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Vui lòng nhập email';
+              return 'Please enter email';
             }
             if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-              return 'Email không hợp lệ';
+              return 'Invalid email format';
             }
             return null;
           },
@@ -472,8 +502,8 @@ class _LoginPageState extends State<LoginPage> {
           controller: _passwordController,
           obscureText: !_isPasswordVisible,
           decoration: AuthTheme.inputDecoration(
-            label: 'Mật khẩu',
-            hint: 'Nhập mật khẩu của bạn',
+            label: 'Password',
+            hint: 'Enter your password',
             leading: Icon(Icons.lock_outline, color: AuthTheme.primary),
             trailing: IconButton(
               icon: Icon(
@@ -489,10 +519,10 @@ class _LoginPageState extends State<LoginPage> {
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Vui lòng nhập mật khẩu';
+              return 'Please enter password';
             }
             if (value.length < 6) {
-              return 'Mật khẩu phải có ít nhất 6 ký tự';
+              return 'Password must be at least 6 characters';
             }
             return null;
           },
@@ -524,7 +554,7 @@ class _LoginPageState extends State<LoginPage> {
         onPressed: () {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Tính năng quên mật khẩu sẽ được thêm sau'),
+              content: Text('Forgot password feature will be added later'),
               backgroundColor: AuthTheme.primary,
             ),
           );
@@ -542,7 +572,7 @@ class _LoginPageState extends State<LoginPage> {
           children: const [
             Icon(Icons.help_outline, size: 18),
             SizedBox(width: 6),
-            Text('Quên mật khẩu?'),
+            Text('Forgot Password?'),
           ],
         ),
       ),
@@ -554,7 +584,7 @@ class _LoginPageState extends State<LoginPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Chưa có tài khoản?',
+          "Don't have an account?",
           textAlign: TextAlign.center,
           style: AuthTheme.subtitle(),
         ),
@@ -579,7 +609,7 @@ class _LoginPageState extends State<LoginPage> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            child: const Text('Tạo tài khoản Green Loop'),
+            child: const Text('Create Green Loop Account'),
           ),
         ),
       ],
@@ -615,7 +645,7 @@ class _LoginPageState extends State<LoginPage> {
       final prefixRegex = RegExp(r'^(login failed:\s*)+', caseSensitive: false);
       msg = msg.replaceFirst(prefixRegex, '').trimLeft();
       if (RegExp('bad credentials', caseSensitive: false).hasMatch(msg)) {
-        msg = 'Email hoặc mật khẩu không đúng';
+        msg = 'Email or password is incorrect';
       }
 
       // Check if error is about unverified email
@@ -652,29 +682,42 @@ class _LoginPageState extends State<LoginPage> {
 
       // Lấy thông tin user để check role
       final currentUser = authService.currentUser;
-      String roleMessage = 'Đăng nhập thành công!';
+      String roleMessage = 'Login successful!';
 
       if (currentUser != null) {
         if (currentUser.role == UserRole.staff) {
-          roleMessage = 'Chào mừng nhân viên ${currentUser.name}!';
+          roleMessage = 'Welcome staff ${currentUser.name}!';
         } else {
-          roleMessage = 'Chào mừng khách hàng ${currentUser.name}!';
+          roleMessage = 'Welcome customer ${currentUser.name}!';
         }
       }
 
       // Hiển thị thông báo thành công với role
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(roleMessage),
-          backgroundColor: AuthTheme.primary,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(roleMessage),
+            backgroundColor: AuthTheme.primary,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
 
-      // App sẽ tự động redirect sau khi login thành công
-      // Không cần Navigator.pop() vì authentication guard sẽ handle
+      // Wait a bit for the auth state to propagate, then ensure navigation
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          // The Consumer in main.dart will automatically rebuild and show home page
+          // when authService.isLoggedIn becomes true
+          // Force a rebuild to ensure the auth guard detects the change
+          if (mounted && authService.isLoggedIn) {
+            // Navigation is handled by the auth guard in main.dart
+            // No explicit navigation needed
+          }
+        });
+      }
     } else {
       // Hiển thị thông báo lỗi
-      final fallback = 'Email hoặc mật khẩu không đúng';
+      final fallback = 'Email or password is incorrect';
       setState(() {
         _errorMessage = _errorMessage ?? fallback;
       });
@@ -695,7 +738,7 @@ class _LoginPageState extends State<LoginPage> {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
       setState(() {
-        _errorMessage = 'Vui lòng nhập email';
+        _errorMessage = 'Please enter email';
       });
       return;
     }
@@ -713,7 +756,7 @@ class _LoginPageState extends State<LoginPage> {
       if (success) {
         setState(() {
           _resendSuccess =
-              'Email xác thực đã được gửi! Vui lòng kiểm tra hộp thư của bạn.';
+              'Verification email has been sent! Please check your inbox.';
           _resendCooldown = 60;
         });
 

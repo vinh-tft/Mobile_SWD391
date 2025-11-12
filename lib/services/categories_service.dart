@@ -176,6 +176,56 @@ class CategoriesService extends ChangeNotifier {
     return await createCategory(request);
   }
 
+  // Update category
+  Future<bool> updateCategory(String categoryId, Map<String, dynamic> categoryData) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final request = CategoryCreateRequest(
+        name: categoryData['name'] ?? '',
+        description: categoryData['description'] ?? '',
+        parentCategoryId: categoryData['parentCategoryId'],
+        displayOrder: categoryData['displayOrder'] ?? 0,
+        isActive: categoryData['isActive'] ?? true,
+      );
+      
+      final response = await _api.put('/api/categories/$categoryId', body: request.toJson());
+      final apiResponse = ApiResponse<CategoryResponse>.fromJson(
+        response,
+        (data) => CategoryResponse.fromJson(data),
+      );
+
+      if (apiResponse.success) {
+        // Reload categories to reflect changes
+        await loadCategories();
+        return true;
+      } else {
+        _error = apiResponse.message;
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  // Create category with Map data
+  Future<bool> createCategoryWithMap(Map<String, dynamic> categoryData) async {
+    final request = CategoryCreateRequest(
+      name: categoryData['name'] ?? '',
+      description: categoryData['description'] ?? '',
+      parentCategoryId: categoryData['parentCategoryId'],
+      displayOrder: categoryData['displayOrder'] ?? 0,
+      isActive: categoryData['isActive'] ?? true,
+    );
+    return await createCategory(request);
+  }
+
   // Search categories
   Future<List<CategoryResponse>> searchCategories(String query) async {
     try {
@@ -186,6 +236,8 @@ class CategoriesService extends ChangeNotifier {
       );
 
       if (apiResponse.success && apiResponse.data != null) {
+        _categories = apiResponse.data!;
+        notifyListeners();
         return apiResponse.data!;
       }
       return [];

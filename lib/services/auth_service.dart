@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum UserRole { customer, staff }
+enum UserRole { customer, staff, admin }
 
 class User {
   final String id;
@@ -95,7 +95,8 @@ class AuthService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isCustomer => _currentUser?.role == UserRole.customer;
   bool get isStaff => _currentUser?.role == UserRole.staff;
-  bool get isAdmin => _currentUser?.role == UserRole.staff; // Staff has admin privileges
+  bool get isAdmin => _currentUser?.role == UserRole.admin;
+  bool get hasAdminAccess => isAdmin || isStaff; // Both admin and staff can access admin features
   Future<void> restoreSession() async {
     if (_api == null) return;
     final prefs = await SharedPreferences.getInstance();
@@ -126,10 +127,14 @@ class AuthService extends ChangeNotifier {
             print('🔍 RestoreSession - userType field: ${me['userType']} (type: ${me['userType'].runtimeType})');
             final roleStr = (roleFromRole ?? roleFromUserType ?? 'CUSTOMER').toUpperCase();
             print('🔍 RestoreSession - Final role (uppercase): $roleStr');
-            // ADMIN and STAFF both map to UserRole.staff
-            final isStaff = roleStr == 'STAFF' || roleStr == 'ADMIN';
-            print('🔍 RestoreSession - Is staff/admin: $isStaff');
-            return isStaff ? UserRole.staff : UserRole.customer;
+            // Map roles correctly: ADMIN -> admin, STAFF -> staff
+            if (roleStr == 'ADMIN') {
+              return UserRole.admin;
+            } else if (roleStr == 'STAFF') {
+              return UserRole.staff;
+            } else {
+              return UserRole.customer;
+            }
           }(),
         points: () {
           final pointsValue = me['points'] ?? me['sustainabilityPoints'] ?? 0;
@@ -240,10 +245,14 @@ class AuthService extends ChangeNotifier {
             print('🔍 Login - userType field: ${me['userType']} (type: ${me['userType'].runtimeType})');
             final roleStr = roleFromRole ?? roleFromUserType ?? 'CUSTOMER';
             print('🔍 Login - Final role (uppercase): $roleStr');
-            // ADMIN and STAFF both map to UserRole.staff (for admin privileges)
-            final isStaff = roleStr == 'STAFF' || roleStr == 'ADMIN';
-            print('🔍 Login - Is staff/admin: $isStaff (will use staff role)');
-            return isStaff ? UserRole.staff : UserRole.customer;
+            // Map roles correctly: ADMIN -> admin, STAFF -> staff
+            if (roleStr == 'ADMIN') {
+              return UserRole.admin;
+            } else if (roleStr == 'STAFF') {
+              return UserRole.staff;
+            } else {
+              return UserRole.customer;
+            }
           }(),
           points: () {
             print('🔍 ========== PARSING POINTS ==========');

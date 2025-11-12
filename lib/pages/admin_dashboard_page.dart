@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import 'admin_items_page.dart';
+import 'admin_donations_page.dart';
+import 'admin_brands_page.dart';
+import 'admin_categories_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -75,7 +78,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         backgroundColor: const Color(0xFF10B981),
         elevation: 0,
         title: const Text(
-          'Admin Dashboard',
+          'Staff Dashboard',
           style: TextStyle(
             color: Colors.white,
             fontSize: 20,
@@ -122,11 +125,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Welcome Header
-                    _buildWelcomeHeader(user),
-
-                    const SizedBox(height: 24),
-
                     // Stats Grid
                     _buildStatsGrid(),
 
@@ -151,49 +149,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildWelcomeHeader(User? user) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Xin chào,',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            user?.name ?? 'Admin',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Đây là tổng quan về nền tảng của bạn',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildStatsGrid() {
     if (_stats == null) return const SizedBox.shrink();
 
@@ -206,28 +161,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       childAspectRatio: 1.5,
       children: [
         _buildStatCard(
-          'Tổng người dùng',
+          'Total Users',
           _stats!['totalUsers'].toString(),
           _stats!['userChange'],
           Icons.people,
           const Color(0xFF3B82F6),
         ),
         _buildStatCard(
-          'Sản phẩm đang bán',
+          'Active Listings',
           _stats!['activeListings'].toString(),
           _stats!['listingsChange'],
           Icons.shopping_bag,
           const Color(0xFF8B5CF6),
         ),
         _buildStatCard(
-          'Đã bán',
+          'Sold',
           _stats!['itemsSold'].toString(),
           _stats!['salesChange'],
           Icons.inventory,
           const Color(0xFFF59E0B),
         ),
         _buildStatCard(
-          'Doanh thu',
+          'Revenue',
           '\$${_stats!['revenue']}',
           _stats!['revenueChange'],
           Icons.attach_money,
@@ -315,7 +270,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
               const SizedBox(width: 4),
               const Text(
-                'từ tháng trước',
+                'from last month',
                 style: TextStyle(
                   fontSize: 11,
                   color: Color(0xFF9CA3AF),
@@ -333,7 +288,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Hành động nhanh',
+          'Quick Actions',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -349,19 +304,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           crossAxisSpacing: 12,
           childAspectRatio: 1.2,
           children: [
+            // Staff features (Admin và Staff đều có)
             _buildQuickActionCard(
-              'Quản lý\nNgười dùng',
-              Icons.people_outline,
-              const Color(0xFF3B82F6),
-              () {
-                // Navigate to users management
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Tính năng đang phát triển')),
-                );
-              },
-            ),
-            _buildQuickActionCard(
-              'Quản lý\nSản phẩm',
+              'Manage\nProducts',
               Icons.inventory_outlined,
               const Color(0xFF8B5CF6),
               () {
@@ -374,49 +319,47 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               },
             ),
             _buildQuickActionCard(
-              'Danh mục',
-              Icons.category_outlined,
-              const Color(0xFFF59E0B),
-              () {
-                // Navigate to categories
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Tính năng đang phát triển')),
-                );
-              },
-            ),
-            _buildQuickActionCard(
-              'Thương hiệu',
-              Icons.branding_watermark_outlined,
-              const Color(0xFF10B981),
-              () {
-                // Navigate to brands
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Tính năng đang phát triển')),
-                );
-              },
-            ),
-            _buildQuickActionCard(
-              'Báo cáo',
-              Icons.analytics_outlined,
+              'Manage\nDonations',
+              Icons.inventory_2_outlined,
               const Color(0xFFEC4899),
               () {
-                // Navigate to analytics
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Tính năng đang phát triển')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AdminDonationsPage(),
+                  ),
                 );
               },
             ),
-            _buildQuickActionCard(
-              'Cài đặt',
-              Icons.settings_outlined,
-              const Color(0xFF6366F1),
-              () {
-                // Navigate to settings
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Tính năng đang phát triển')),
-                );
-              },
-            ),
+            // Admin only features
+            if (Provider.of<AuthService>(context, listen: false).isAdmin) ...[
+              _buildQuickActionCard(
+                'Manage\nBrands',
+                Icons.branding_watermark_outlined,
+                const Color(0xFF10B981),
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AdminBrandsPage(),
+                    ),
+                  );
+                },
+              ),
+              _buildQuickActionCard(
+                'Manage\nCategories',
+                Icons.category_outlined,
+                const Color(0xFFF59E0B),
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AdminCategoriesPage(),
+                    ),
+                  );
+                },
+              ),
+            ],
           ],
         ),
       ],
@@ -501,7 +444,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               Icon(Icons.history, color: Color(0xFF6B7280), size: 20),
               SizedBox(width: 8),
               Text(
-                'Hoạt động gần đây',
+                'Recent Activities',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -612,7 +555,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               Icon(Icons.trending_up, color: Color(0xFF6B7280), size: 20),
               SizedBox(width: 8),
               Text(
-                'Tổng quan doanh thu',
+                'Revenue Overview',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -623,7 +566,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Doanh thu 6 tháng gần đây',
+            'Revenue for the last 6 months',
             style: TextStyle(
               fontSize: 13,
               color: Color(0xFF6B7280),
@@ -647,7 +590,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'Biểu đồ sẽ được triển khai ở đây',
+                    'Chart will be implemented here',
                     style: TextStyle(
                       fontSize: 14,
                       color: Color(0xFF6B7280),

@@ -3,7 +3,8 @@ import 'package:provider/provider.dart';
 import '../services/cart_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
-import 'checkout_simple_page.dart';
+import 'checkout_page.dart';
+import 'marketplace_page.dart';
 
 class CartPage extends StatelessWidget {
   const CartPage({super.key});
@@ -12,434 +13,528 @@ class CartPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.card,
-        elevation: 0,
-        title: Text(
-          'Giỏ hàng',
-          style: TextStyle(
-            color: AppColors.foreground,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.3,
-          ),
-        ),
-        actions: [
-          Consumer<CartService>(
-            builder: (context, cart, _) {
-              if (cart.isEmpty) return const SizedBox();
-              return TextButton(
-                onPressed: () {
-                  _showClearCartDialog(context);
-                },
-                child: Text(
-                  'Xóa tất cả',
-                  style: TextStyle(color: AppColors.destructive),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
       body: Consumer2<CartService, AuthService>(
         builder: (context, cart, auth, _) {
-          if (cart.isEmpty) {
-            return _buildEmptyCart();
-          }
-
-          return Column(
-            children: [
-              // Cart Items List
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: cart.items.length,
-                  itemBuilder: (context, index) {
-                    final item = cart.items[index];
-                    return _buildCartItem(context, item, cart);
-                  },
+          return SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header - Match React FE
+                    _buildHeader(context),
+                    const SizedBox(height: 32),
+                    
+                    if (cart.isEmpty)
+                      _buildEmptyCart(context)
+                    else
+                      _buildCartContent(context, cart, auth),
+                  ],
                 ),
               ),
-              // Cart Summary
-              _buildCartSummary(context, cart, auth),
-            ],
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _buildEmptyCart() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.muted,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.shopping_cart_outlined,
-                size: 80,
+  // Header - Match React FE: Continue Shopping button + Shopping Cart title
+  Widget _buildHeader(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Continue Shopping button - Match React FE
+        InkWell(
+          onTap: () => Navigator.pop(context),
+          child: Row(
+            children: [
+              Icon(
+                Icons.arrow_back,
+                size: 16,
                 color: AppColors.mutedForeground,
               ),
+              const SizedBox(width: 8),
+              Text(
+                'Continue Shopping',
+                style: TextStyle(
+                  color: AppColors.mutedForeground,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Shopping Cart title - Match React FE
+        Row(
+          children: [
+            Icon(
+              Icons.shopping_cart,
+              size: 40,
+              color: AppColors.primary,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(width: 12),
             Text(
-              'Giỏ hàng trống',
+              'Shopping Cart',
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 32,
                 fontWeight: FontWeight.bold,
+                color: AppColors.foreground,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Empty Cart - Match React FE
+  Widget _buildEmptyCart(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(64),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.shopping_cart_outlined,
+              size: 64,
+              color: AppColors.mutedForeground,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Your cart is empty',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
                 color: AppColors.foreground,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
-              'Thêm sản phẩm vào giỏ hàng để bắt đầu mua sắm',
+              'Add items from the marketplace to get started!',
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 14,
                 color: AppColors.mutedForeground,
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                // Navigate to marketplace
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const MarketplacePage()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Browse Marketplace',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
+  // Cart Content - Match React FE: Grid layout with items and summary
+  Widget _buildCartContent(BuildContext context, CartService cart, AuthService auth) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 768; // lg breakpoint
+        
+        if (isWide) {
+          // Desktop/Tablet: Side-by-side layout - Match React FE
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Cart Items - Match React FE: lg:col-span-2
+              Expanded(
+                flex: 2,
+                child: Column(
+                  children: [
+                    ...cart.items.map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildCartItem(context, item, cart),
+                    )),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 32),
+              // Order Summary - Match React FE: lg:col-span-1 sticky
+              SizedBox(
+                width: constraints.maxWidth * 0.33,
+                child: _buildOrderSummary(context, cart, auth),
+              ),
+            ],
+          );
+        } else {
+          // Mobile: Stacked layout
+          return Column(
+            children: [
+              // Cart Items
+              ...cart.items.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildCartItem(context, item, cart),
+              )),
+              const SizedBox(height: 24),
+              // Order Summary
+              _buildOrderSummary(context, cart, auth),
+            ],
+          );
+        }
+      },
+    );
+  }
+
+  // Cart Item - Match React FE design
   Widget _buildCartItem(BuildContext context, CartItem item, CartService cart) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Product Image
-            ClipRRect(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Item Image - Match React FE: w-24 h-24
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              color: AppColors.muted,
               borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: 80,
-                height: 80,
-                color: AppColors.muted,
-                child: item.imageUrl != null
-                    ? Image.network(
-                        item.imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(
-                          Icons.image_outlined,
-                          color: AppColors.mutedForeground,
-                          size: 32,
-                        ),
-                      )
-                    : Icon(
-                        Icons.image_outlined,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: item.imageUrl != null
+                  ? Image.network(
+                      item.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Icon(
+                        Icons.shopping_cart_outlined,
                         color: AppColors.mutedForeground,
                         size: 32,
                       ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Product Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.foreground,
+                    )
+                  : Icon(
+                      Icons.shopping_cart_outlined,
+                      color: AppColors.mutedForeground,
+                      size: 32,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  if (item.brand != null)
-                    Text(
-                      item.brand!,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.mutedForeground,
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.muted,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Size: ${item.size}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.mutedForeground,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          item.condition,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      // Quantity Controls
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.border),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove, size: 18),
-                              onPressed: () => cart.decreaseQuantity(item.itemId),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                '${item.quantity}',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.foreground,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add, size: 18),
-                              onPressed: () => cart.increaseQuantity(item.itemId),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      // Price
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.stars_rounded, color: AppColors.primary, size: 18),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${item.totalPoints}',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (item.quantity > 1)
-                            Text(
-                              '${item.pointValue} đ/sp',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.mutedForeground,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
             ),
-            // Delete Button
-            IconButton(
-              icon: Icon(Icons.close, color: AppColors.mutedForeground, size: 20),
-              onPressed: () => _showRemoveItemDialog(context, item, cart),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCartSummary(BuildContext context, CartService cart, AuthService auth) {
-    final userPoints = auth.currentUser?.points ?? 0;
-    final sufficient = userPoints >= cart.totalPoints;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 24,
-            offset: const Offset(0, -4),
           ),
-        ],
-      ),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Summary Row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          const SizedBox(width: 16),
+          // Item Details - Match React FE: flex-1
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Item Name - Match React FE: font-semibold text-lg
                 Text(
-                  'Tổng cộng',
+                  item.name,
                   style: TextStyle(
-                    fontSize: 16,
-                    color: AppColors.mutedForeground,
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
+                    color: AppColors.foreground,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                // Price per item - Match React FE: text-sm text-muted-foreground
+                Text(
+                  '${item.pointValue} points each',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.mutedForeground,
                   ),
                 ),
+                const SizedBox(height: 12),
+                // Quantity Controls - Match React FE
                 Row(
                   children: [
-                    Icon(Icons.stars_rounded, color: AppColors.primary, size: 24),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${cart.totalPoints} điểm',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => cart.decreaseQuantity(item.itemId),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(
+                            Icons.remove,
+                            size: 16,
+                            color: AppColors.foreground,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 48,
+                      child: Text(
+                        '${item.quantity}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.foreground,
+                        ),
+                      ),
+                    ),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => cart.increaseQuantity(item.itemId),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(
+                            Icons.add,
+                            size: 16,
+                            color: AppColors.foreground,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            // User Points Balance
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Số dư hiện tại',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.mutedForeground,
+          ),
+          // Subtotal & Remove - Match React FE: text-right
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Subtotal - Match React FE: text-lg font-bold
+              Text(
+                '${item.totalPoints} points',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.foreground,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Remove button - Match React FE: Trash2 icon
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _showRemoveItemDialog(context, item, cart),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.destructive.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.delete_outline,
+                      size: 20,
+                      color: AppColors.destructive,
+                    ),
                   ),
                 ),
-                Text(
-                  '$userPoints điểm',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: sufficient ? AppColors.foreground : AppColors.destructive,
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Order Summary - Match React FE: Order Summary sidebar
+  Widget _buildOrderSummary(BuildContext context, CartService cart, AuthService auth) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Title - Match React FE: text-xl font-semibold
+          Text(
+            'Order Summary',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: AppColors.foreground,
             ),
-            if (!sufficient)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.destructive.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+          ),
+          const SizedBox(height: 24),
+          // Summary details - Match React FE: space-y-3
+          Column(
+            children: [
+              // Subtotal - Match React FE
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Subtotal (${cart.items.length} items)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.mutedForeground,
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.warning_amber_rounded, color: AppColors.destructive, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Không đủ điểm. Vui lòng nạp thêm điểm.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.destructive,
-                            fontWeight: FontWeight.w600,
-                          ),
+                  Text(
+                    '${cart.totalPoints} points',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.mutedForeground,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Shipping - Match React FE: Free
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Shipping',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.mutedForeground,
+                    ),
+                  ),
+                  Text(
+                    'Free',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.mutedForeground,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Tax - Match React FE: 0
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Tax',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.mutedForeground,
+                    ),
+                  ),
+                  Text(
+                    '0 points',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.mutedForeground,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Divider - Match React FE: border-t
+              Divider(color: AppColors.border),
+              const SizedBox(height: 12),
+              // Total - Match React FE: text-lg font-bold text-primary
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Total',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.foreground,
+                    ),
+                  ),
+                  Text(
+                    '${cart.totalPoints} points',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // Checkout Button - Match React FE: w-full Button with CreditCard icon
+          // Button always enabled (only disabled when cart.length === 0) - Match React FE
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: cart.isEmpty
+                  ? null
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CheckoutPage(),
                         ),
-                      ),
-                    ],
-                  ),
+                      );
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                elevation: 0,
+                disabledBackgroundColor: AppColors.muted,
               ),
-            const SizedBox(height: 16),
-            // Checkout Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: sufficient
-                    ? () {
-                        // Navigate to checkout with cart items
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => CheckoutSimplePage(
-                              product: {
-                                'items': cart.items.map((item) => item.toJson()).toList(),
-                                'totalPoints': cart.totalPoints,
-                                'itemCount': cart.itemCount,
-                              },
-                              quantity: cart.itemCount,
-                            ),
-                          ),
-                        );
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.credit_card, size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Proceed to Checkout',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                  elevation: 0,
-                  disabledBackgroundColor: AppColors.muted,
-                ),
-                child: Text(
-                  sufficient ? 'Thanh toán (${cart.itemCount} sản phẩm)' : 'Không đủ điểm',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          // Footer text - Match React FE
+          Center(
+            child: Text(
+              'Secure checkout powered by Green Loop',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.mutedForeground,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -449,12 +544,12 @@ class CartPage extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Xóa sản phẩm'),
-        content: Text('Bạn có chắc muốn xóa "${item.name}" khỏi giỏ hàng?'),
+        title: const Text('Remove Product'),
+        content: Text('Are you sure you want to remove "${item.name}" from cart?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -464,7 +559,7 @@ class CartPage extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.destructive,
             ),
-            child: const Text('Xóa'),
+            child: const Text('Remove'),
           ),
         ],
       ),
@@ -476,12 +571,12 @@ class CartPage extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Xóa giỏ hàng'),
-        content: const Text('Bạn có chắc muốn xóa tất cả sản phẩm khỏi giỏ hàng?'),
+        title: const Text('Clear Cart'),
+        content: const Text('Are you sure you want to remove all products from cart?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -491,7 +586,7 @@ class CartPage extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.destructive,
             ),
-            child: const Text('Xóa tất cả'),
+            child: const Text('Clear All'),
           ),
         ],
       ),

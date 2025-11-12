@@ -6,6 +6,8 @@ import 'pages/profile_page.dart';
 import 'pages/posts_page.dart';
 import 'pages/transactions_page.dart';
 import 'pages/login_page.dart';
+import 'pages/admin_dashboard_page.dart';
+import 'pages/admin_users_page.dart';
 import 'services/auth_service.dart';
 import 'services/clothing_service.dart';
 import 'services/api_client.dart';
@@ -19,6 +21,7 @@ import 'services/sales_service.dart';
 import 'services/google_auth_service.dart';
 import 'services/cart_service.dart';
 import 'services/chat_service.dart';
+import 'services/donations_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_colors.dart';
 import 'widgets/animated_bottom_nav.dart';
@@ -29,21 +32,22 @@ import 'pages/video_call_page.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
 import 'services/fake_api_client.dart';
+import 'config/app_config.dart';
+import 'config/api_config.dart';
 
 void main() {
+  // Log API configuration on app start (matches React FE)
+  logApiConfig();
+  
   runApp(
     MultiProvider(
       providers: [
         // API client and services
+        // Use ApiConfig.baseUrl which reads from --dart-define=API_URL (matches React FE NEXT_PUBLIC_API_URL)
         Provider<ApiClient>(create: (_) {
-          // Use local backend in debug for easier testing
-          const String defaultProd = 'https://greenloop.up.railway.app';
-          // On Android emulator, localhost is 10.0.2.2
-          const String androidLocal = 'http://10.0.2.2:8080';
-          const String desktopLocal = 'http://localhost:8080';
-          final String base = kIsWeb
-              ? desktopLocal
-              : (defaultTargetPlatform == TargetPlatform.android && kDebugMode ? androidLocal : (kDebugMode ? desktopLocal : defaultProd));
+          // Use ApiConfig.baseUrl (matches React FE API_CONFIG.BASE_URL)
+          // Falls back to AppConfig.getApiUrl for backward compatibility
+          final String base = ApiConfig.baseUrl;
           return ApiClient(baseUrl: base);
         }),
         // Health uses real API now
@@ -99,6 +103,13 @@ void main() {
             const bool useFakeData = false; // Use real API
             final api = useFakeData ? FakeApiClient() : context.read<ApiClient>();
             return UsersService(api);
+          },
+        ),
+        Provider<DonationsService>(
+          create: (context) {
+            const bool useFakeData = false; // Use real API
+            final api = useFakeData ? FakeApiClient() : context.read<ApiClient>();
+            return DonationsService(api);
           },
         ),
         Provider<PointsService>(
@@ -186,10 +197,10 @@ class _GreenLoopHomePageState extends State<GreenLoopHomePage> {
     final authService = context.read<AuthService>();
     if (authService.isLoggedIn && !_hasInitializedRole) {
       _hasInitializedRole = true;
-      if (authService.isStaff) {
-        // Staff users start at marketplace (inventory management)
+      if (authService.hasAdminAccess) {
+        // Admin and Staff users start at admin dashboard (quản lý)
         setState(() {
-          _selectedIndex = 1;
+          _selectedIndex = 0; // Admin Dashboard (index 0 vì không có Trang chủ)
         });
       } else {
         // Customer users start at home
@@ -208,6 +219,8 @@ class _GreenLoopHomePageState extends State<GreenLoopHomePage> {
         if (authService.isLoggedIn && !_hasInitializedRole) {
           print('🔍 Main - User logged in, role: ${authService.currentUser?.role}');
           print('🔍 Main - isStaff: ${authService.isStaff}');
+          print('🔍 Main - isAdmin: ${authService.isAdmin}');
+          print('🔍 Main - hasAdminAccess: ${authService.hasAdminAccess}');
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _initializeRoleBasedNavigation();
           });
@@ -231,18 +244,19 @@ class _GreenLoopHomePageState extends State<GreenLoopHomePage> {
   }
 
   Widget _getCurrentPage(AuthService authService) {
-    if (authService.isStaff) {
+    if (authService.hasAdminAccess) {
+      // Staff/Admin navigation (không có Trang chủ)
       switch (_selectedIndex) {
         case 0:
-          return const HomePage();
+          return const AdminDashboardPage(); // Quản lý
         case 1:
-          return const MarketplacePage();
+          return const ChatListPage(); // Chat với khách hàng
         case 2:
-          return const TransactionsPage();
+          return const AdminUsersPage(); // Userr
         case 3:
-          return const ProfilePage();
+          return const ProfilePage(); // Admin/Nhân viên
         default:
-          return const HomePage();
+          return const AdminDashboardPage();
       }
     } else {
       // Customer navigation
@@ -268,16 +282,20 @@ class _GreenLoopHomePageState extends State<GreenLoopHomePage> {
     final cart = context.watch<CartService>();
     
     // Define navigation items based on role
-    final List<BottomNavItem> items = authService.isStaff 
+    final List<BottomNavItem> items = authService.hasAdminAccess 
       ? [
-          const BottomNavItem(icon: Icons.home_rounded, label: 'Trang chủ'),
-          const BottomNavItem(icon: Icons.inventory_2_rounded, label: 'Quản lý'),
-          const BottomNavItem(icon: Icons.receipt_long_rounded, label: 'Giao dịch'),
-          const BottomNavItem(icon: Icons.person_rounded, label: 'Nhân viên'),
+          // Staff/Admin navigation (4 tabs - không có Trang chủ)
+          const BottomNavItem(icon: Icons.dashboard_rounded, label: 'Quản lý'),
+          const BottomNavItem(icon: Icons.chat_rounded, label: 'Chat với khách hàng'),
+          const BottomNavItem(icon: Icons.people_rounded, label: 'User'),
+          BottomNavItem(
+            icon: Icons.person_rounded, 
+            label: authService.isAdmin ? 'Staff' : 'Nhân viên'
+          ),
         ]
       : [
           const BottomNavItem(icon: Icons.home_rounded, label: 'Trang chủ'),
-          const BottomNavItem(icon: Icons.shopping_bag_rounded, label: 'Cửa hàng'),
+          const BottomNavItem(icon: Icons.shopping_bag_rounded, label: 'Marketplace'),
           const BottomNavItem(icon: Icons.shopping_cart_rounded, label: 'Giỏ hàng'),
           const BottomNavItem(icon: Icons.chat_rounded, label: 'Tin nhắn'),
           const BottomNavItem(icon: Icons.person_rounded, label: 'Cá nhân'),
@@ -301,7 +319,7 @@ class _GreenLoopHomePageState extends State<GreenLoopHomePage> {
           animationDuration: const Duration(milliseconds: 300),
         ),
         // Cart Badge (for customers only)
-        if (!authService.isStaff && cart.itemCount > 0)
+        if (!authService.hasAdminAccess && cart.itemCount > 0)
           Positioned(
             top: 8,
             left: MediaQuery.of(context).size.width * 0.4 + 20, // Position over cart icon (adjusted for 5 tabs)

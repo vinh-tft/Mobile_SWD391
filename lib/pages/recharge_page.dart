@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/points_service.dart';
 
@@ -12,38 +14,19 @@ class RechargePage extends StatefulWidget {
 
 class _RechargePageState extends State<RechargePage> {
   final TextEditingController _amountController = TextEditingController();
-  int _selectedAmount = 0;
+  int? _selectedPackage;
   bool _isLoading = false;
-  String? _selectedPaymentMethod;
 
-  final List<int> _quickAmounts = [500, 1000, 2000, 5000, 10000];
-  
-  final List<Map<String, dynamic>> _paymentMethods = [
-    {
-      'id': 'momo',
-      'name': 'Ví MoMo',
-      'icon': Icons.phone_android,
-      'color': const Color(0xFFD82D8B),
-    },
-    {
-      'id': 'zalopay',
-      'name': 'ZaloPay',
-      'icon': Icons.payment,
-      'color': const Color(0xFF0068FF),
-    },
-    {
-      'id': 'banking',
-      'name': 'Chuyển khoản ngân hàng',
-      'icon': Icons.account_balance,
-      'color': const Color(0xFF22C55E),
-    },
-    {
-      'id': 'cash',
-      'name': 'Thanh toán tại cửa hàng',
-      'icon': Icons.store,
-      'color': const Color(0xFF8B5CF6),
-    },
+  final List<Map<String, dynamic>> _pointPackages = [
+    { 'points': 10000, 'price': 10000, 'popular': false, 'label': '10K' },
+    { 'points': 50000, 'price': 50000, 'popular': true, 'label': '50K' },
+    { 'points': 100000, 'price': 100000, 'popular': false, 'label': '100K' },
+    { 'points': 500000, 'price': 500000, 'popular': false, 'label': '500K' },
   ];
+
+  static const int PRICE_PER_POINT = 1; // 1 VND per point
+  static const int MIN_POINTS = 10000;    // Minimum 10,000 points
+  static const int MAX_POINTS = 10000000; // Maximum 10,000,000 points
 
   @override
   void dispose() {
@@ -63,7 +46,7 @@ class _RechargePageState extends State<RechargePage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Nạp điểm',
+          'Recharge Points',
           style: TextStyle(
             color: Color(0xFF1F2937),
             fontSize: 18,
@@ -100,7 +83,7 @@ class _RechargePageState extends State<RechargePage> {
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Số điểm hiện tại',
+                        'Current Points',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -109,7 +92,7 @@ class _RechargePageState extends State<RechargePage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '${authService.currentUser?.points ?? 0} điểm',
+                        '${authService.currentUser?.points ?? 0} points',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 32,
@@ -122,9 +105,9 @@ class _RechargePageState extends State<RechargePage> {
 
                 const SizedBox(height: 32),
 
-                // Quick Amount Selection
+                // Package Selection
                 const Text(
-                  'Chọn số điểm nhanh',
+                  'Select Points Package',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -139,46 +122,96 @@ class _RechargePageState extends State<RechargePage> {
                     crossAxisCount: 2,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
-                    childAspectRatio: 2.5,
+                    childAspectRatio: 1.2,
                   ),
-                  itemCount: _quickAmounts.length,
+                  itemCount: _pointPackages.length,
                   itemBuilder: (context, index) {
-                    final amount = _quickAmounts[index];
-                    final isSelected = _selectedAmount == amount;
+                    final package = _pointPackages[index];
+                    final points = package['points'] as int;
+                    final price = package['price'] as int;
+                    final label = package['label'] as String;
+                    final popular = package['popular'] as bool;
+                    final isSelected = _selectedPackage == points;
+                    
                     return GestureDetector(
                       onTap: () {
                         setState(() {
-                          _selectedAmount = amount;
-                          _amountController.text = amount.toString();
+                          _selectedPackage = points;
+                          _amountController.text = points.toString();
                         });
                       },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSelected 
-                              ? const Color(0xFF22C55E).withOpacity(0.1)
-                              : Colors.grey[100],
-                          border: Border.all(
-                            color: isSelected 
-                                ? const Color(0xFF22C55E)
-                                : Colors.grey[300]!,
-                            width: isSelected ? 2 : 1,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${amount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} điểm',
-                            style: TextStyle(
+                      child: Stack(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
                               color: isSelected 
-                                  ? const Color(0xFF22C55E)
-                                  : const Color(0xFF1F2937),
-                              fontSize: 16,
-                              fontWeight: isSelected 
-                                  ? FontWeight.bold 
-                                  : FontWeight.w500,
+                                  ? const Color(0xFF22C55E).withOpacity(0.1)
+                                  : Colors.white,
+                              border: Border.all(
+                                color: isSelected 
+                                    ? const Color(0xFF22C55E)
+                                    : Colors.grey[300]!,
+                                width: isSelected ? 2 : 1,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: isSelected 
+                                          ? const Color(0xFF22C55E)
+                                          : const Color(0xFF1F2937),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${points.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} points',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '${price.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} VNĐ',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF22C55E),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
+                          if (popular)
+                            Positioned(
+                              top: -8,
+                              right: -8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF22C55E),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'Popular',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     );
                   },
@@ -188,7 +221,7 @@ class _RechargePageState extends State<RechargePage> {
 
                 // Custom Amount Input
                 const Text(
-                  'Hoặc nhập số điểm tùy chỉnh',
+                  'Or Enter Custom Points',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -200,9 +233,7 @@ class _RechargePageState extends State<RechargePage> {
                   controller: _amountController,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: 'Số điểm',
-                    hintText: 'Nhập số điểm muốn nạp',
-                    prefixIcon: const Icon(Icons.stars, color: Color(0xFF22C55E)),
+                    hintText: 'Enter points (${MIN_POINTS.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} - ${MAX_POINTS.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')})',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -215,172 +246,215 @@ class _RechargePageState extends State<RechargePage> {
                     final amount = int.tryParse(value);
                     if (amount != null) {
                       setState(() {
-                        _selectedAmount = amount;
+                        _selectedPackage = null; // Clear package selection when custom input
                       });
                     }
                   },
                 ),
-
-                const SizedBox(height: 32),
-
-                // Payment Method Selection
-                const Text(
-                  'Chọn phương thức thanh toán',
+                const SizedBox(height: 8),
+                Text(
+                  'Minimum: ${MIN_POINTS.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} points | Maximum: ${MAX_POINTS.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} points',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Column(
-                  children: _paymentMethods.map((method) {
-                    final isSelected = _selectedPaymentMethod == method['id'];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedPaymentMethod = method['id'];
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isSelected 
-                                ? (method['color'] as Color).withOpacity(0.1)
-                                : Colors.grey[100],
-                            border: Border.all(
-                              color: isSelected 
-                                  ? method['color'] as Color
-                                  : Colors.grey[300]!,
-                              width: isSelected ? 2 : 1,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: (method['color'] as Color).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  method['icon'] as IconData,
-                                  color: method['color'] as Color,
-                                  size: 24,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Text(
-                                  method['name'] as String,
-                                  style: TextStyle(
-                                    color: isSelected 
-                                        ? method['color'] as Color
-                                        : const Color(0xFF1F2937),
-                                    fontSize: 16,
-                                    fontWeight: isSelected 
-                                        ? FontWeight.bold 
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                              if (isSelected)
-                                Icon(
-                                  Icons.check_circle,
-                                  color: method['color'] as Color,
-                                  size: 24,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Recharge Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleRecharge,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF22C55E),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text(
-                            'Nạp điểm',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                    fontSize: 12,
+                    color: Colors.grey[600],
                   ),
                 ),
 
                 const SizedBox(height: 24),
 
-                // Info Card
+                // Price Summary
+                if (_getSelectedPoints() > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFD1FAE5), Color(0xFFDBEAFE)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Points:',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Color(0xFF1F2937),
+                              ),
+                            ),
+                            Text(
+                              '${_getSelectedPoints().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} points',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1F2937),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Unit Price:',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Color(0xFF1F2937),
+                              ),
+                            ),
+                            Text(
+                              '${PRICE_PER_POINT.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} VND/point',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Color(0xFF1F2937),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total:',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1F2937),
+                              ),
+                            ),
+                            Text(
+                              '${_calculateTotalPrice().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} VNĐ',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF22C55E),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // Payment Method Info
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
+                    color: const Color(0xFFDBEAFE).withOpacity(0.5),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
                   ),
-                  child: const Column(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: Color(0xFF6B7280),
-                            size: 20,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Thông tin nạp điểm',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1F2937),
+                      Icon(Icons.info_outline, color: const Color(0xFF3B82F6), size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Pay with MoMo',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E40AF),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        '• Điểm được nạp ngay lập tức vào tài khoản\n'
-                        '• Điểm có thể dùng để mua quần áo trong cửa hàng\n'
-                        '• Điểm không có thời hạn sử dụng\n'
-                        '• Liên hệ hỗ trợ nếu gặp vấn đề',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF6B7280),
-                          height: 1.5,
+                            const SizedBox(height: 4),
+                            Text(
+                              'You will be redirected to the MoMo payment page to complete the transaction. Points will be added to your account after successful payment.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
+
+                const SizedBox(height: 32),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isLoading ? null : () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          side: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1F2937),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF22C55E), Color(0xFF3B82F6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: _isLoading || _getSelectedPoints() < MIN_POINTS ? null : _handleRecharge,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'Pay with MoMo',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
               ],
             ),
           );
@@ -389,42 +463,40 @@ class _RechargePageState extends State<RechargePage> {
     );
   }
 
+  int _getSelectedPoints() {
+    if (_selectedPackage != null) {
+      return _selectedPackage!;
+    }
+    final customAmount = int.tryParse(_amountController.text);
+    return customAmount ?? 0;
+  }
+
+  int _calculateTotalPrice() {
+    return _getSelectedPoints() * PRICE_PER_POINT;
+  }
+
   Future<void> _handleRecharge() async {
-    final amount = int.tryParse(_amountController.text);
+    final points = _getSelectedPoints();
     
-    if (amount == null || amount <= 0) {
+    if (points < MIN_POINTS) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng nhập số điểm hợp lệ'),
+        SnackBar(
+          content: Text('Please enter at least ${MIN_POINTS.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} points'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    if (amount < 100) {
+    if (points > MAX_POINTS) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Số điểm tối thiểu là 100 điểm'),
+        SnackBar(
+          content: Text('Maximum ${MAX_POINTS.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} points per transaction'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
-
-    if (_selectedPaymentMethod == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn phương thức thanh toán'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    // Hiển thị dialog xác nhận thanh toán
-    final confirmed = await _showPaymentConfirmationDialog(amount);
-    if (!confirmed) return;
 
     setState(() {
       _isLoading = true;
@@ -435,126 +507,81 @@ class _RechargePageState extends State<RechargePage> {
 
     final userId = authService.currentUser?.id;
     if (userId == null) {
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Không tìm thấy người dùng'),
+          content: Text('User not found'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    final success = await pointsService.adjustPoints(
-      userId: userId,
-      amount: amount,
-      reason: 'recharge_${_selectedPaymentMethod ?? 'unknown'}',
-    );
+    try {
+      // Call MoMo payment API
+      final paymentResponse = await pointsService.buyPointsWithMomo(
+        userId: userId,
+        pointsAmount: points,
+        description: 'Buy $points points',
+      );
 
-    setState(() {
-      _isLoading = false;
-    });
+      setState(() => _isLoading = false);
 
-    if (success) {
-      // Update local points immediately (defensive in case backend mock skips it)
-      authService.addPoints(amount);
+      if (paymentResponse == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to create payment transaction. Please try again'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final success = paymentResponse['success'] as bool? ?? false;
+      final payUrl = paymentResponse['payUrl'] as String?;
+      final paymentId = paymentResponse['paymentId'] as String?;
+      final errorMessage = paymentResponse['errorMessage'] as String?;
+
+      if (!success || payUrl == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage ?? 'Unable to create payment transaction'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Store payment ID for callback handling
+      if (paymentId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('lastPaymentId', paymentId);
+      }
+
+      // Open MoMo payment URL
+      final uri = Uri.parse(payUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        // Close the page after launching payment
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to open payment page'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Nạp thành công $amount điểm!'),
-          backgroundColor: const Color(0xFF22C55E),
-        ),
-      );
-      _amountController.clear();
-      setState(() {
-        _selectedAmount = 0;
-        _selectedPaymentMethod = null;
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nạp điểm thất bại. Vui lòng thử lại'),
+          content: Text('Error: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  Future<bool> _showPaymentConfirmationDialog(int amount) async {
-    final selectedMethod = _paymentMethods.firstWhere(
-      (method) => method['id'] == _selectedPaymentMethod,
-    );
-
-    return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xác nhận thanh toán'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: (selectedMethod['color'] as Color).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    selectedMethod['icon'] as IconData,
-                    color: selectedMethod['color'] as Color,
-                    size: 32,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          selectedMethod['name'] as String,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1F2937),
-                          ),
-                        ),
-                        Text(
-                          '${amount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} điểm',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF6B7280),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Bạn có chắc chắn muốn nạp điểm với phương thức thanh toán này không?',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFF6B7280),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: selectedMethod['color'] as Color,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Xác nhận'),
-          ),
-        ],
-      ),
-    ) ?? false;
-  }
+  // Removed _showPaymentConfirmationDialog - no longer needed with direct MoMo redirect
 }

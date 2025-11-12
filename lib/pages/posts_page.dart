@@ -141,7 +141,7 @@ class _PostsPageState extends State<PostsPage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => ChatPage(sellerName: post['seller'] ?? 'Seller'),
+                                  builder: (_) => const ChatPage(),
                                 ),
                               );
                             },

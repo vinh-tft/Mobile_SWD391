@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_platform_interface/google_sign_in_platform_interface.dart';
 import 'api_client.dart';
@@ -139,15 +140,43 @@ class GoogleAuthService {
         print('🌐 Sending Google token to backend: /api/auth/google/login');
         if (idToken != null) {
           print('🔑 Using ID Token (length: ${idToken.length})');
+          print('🔑 ID Token preview: ${idToken.substring(0, idToken.length > 100 ? 100 : idToken.length)}...');
         } else if (accessToken != null) {
           print('🔑 Using Access Token on web (length: ${accessToken.length})');
         }
       }
       
-      final response = await _api.post('/api/auth/google/login', body: {
-        if (idToken != null) 'idToken': idToken,
-        if (accessToken != null) 'accessToken': accessToken,
-      });
+      // Validate tokens before sending
+      if (idToken != null && idToken.isEmpty) {
+        return GoogleSignInResult(
+          success: false,
+          message: 'ID Token không hợp lệ. Vui lòng thử lại.',
+        );
+      }
+      
+      if (accessToken != null && accessToken.isEmpty) {
+        return GoogleSignInResult(
+          success: false,
+          message: 'Access Token không hợp lệ. Vui lòng thử lại.',
+        );
+      }
+      
+      // Prepare request body
+      final requestBody = <String, String>{};
+      if (idToken != null) {
+        requestBody['idToken'] = idToken;
+      }
+      if (accessToken != null && idToken == null) {
+        // Only send accessToken if we don't have idToken
+        requestBody['accessToken'] = accessToken;
+      }
+      
+      if (kDebugMode) {
+        print('📤 Request body keys: ${requestBody.keys.toList()}');
+        print('📤 Request body size: ${requestBody.toString().length} chars');
+      }
+      
+      final response = await _api.post('/api/auth/google/login', body: requestBody);
       
       if (kDebugMode) {
         print('✅ Backend response received');
@@ -182,20 +211,87 @@ class GoogleAuthService {
       if (kDebugMode) {
         print('❌ Google Sign-In Error: $e');
         print('❌ Error type: ${e.runtimeType}');
+        print('❌ Stack trace: ${StackTrace.current}');
       }
       
       String errorMessage = 'Đăng nhập Google thất bại';
 
-      if (e is ApiException) {
-        errorMessage = e.body;
+      // Handle PlatformException (from Google Sign-In plugin)
+      if (e is PlatformException) {
+        final code = e.code;
+        final message = e.message ?? '';
+        
         if (kDebugMode) {
-          print('❌ API Exception status: ${e.statusCode}');
-          print('❌ API Exception body: ${e.body}');
+          print('❌ PlatformException code: $code');
+          print('❌ PlatformException message: $message');
         }
+        
+        if (code == 'sign_in_failed') {
+          // Check for ApiException: 10 (DEVELOPER_ERROR) - can appear as "10:" or "ApiException: 10"
+          if (message.contains('ApiException: 10') || 
+              message.contains(': 10') || 
+              message.contains('10:') ||
+              message.contains('DEVELOPER_ERROR')) {
+            errorMessage = 'Lỗi cấu hình Google Sign-In (DEVELOPER_ERROR).\n\n'
+                'Vui lòng thêm SHA-1 fingerprint vào Google Cloud Console:\n\n'
+                'SHA-1: 1A:3F:98:FB:F2:2B:3F:9F:77:ED:49:1E:AE:BD:69:C2:91:37:59:F8\n\n'
+                'Package: com.example.greenloop\n\n'
+                'Xem file GOOGLE_SIGNIN_SETUP.md để biết chi tiết.';
+          } else if (message.contains('ApiException: 12500')) {
+            errorMessage = 'Google Play Services không khả dụng. Vui lòng cài đặt Google Play Services.';
+          } else if (message.contains('ApiException: 7')) {
+            errorMessage = 'Không thể kết nối đến Google. Vui lòng kiểm tra kết nối internet.';
+          } else if (message.contains('ApiException: 8')) {
+            errorMessage = 'Lỗi kết nối Google. Vui lòng thử lại.';
+          } else {
+            errorMessage = 'Đăng nhập Google thất bại: $message';
+          }
+        } else if (code == 'sign_in_canceled') {
+          errorMessage = 'Đăng nhập bị hủy';
+        } else if (code == 'network_error') {
+          errorMessage = 'Lỗi mạng. Vui lòng kiểm tra kết nối internet.';
+        } else {
+          errorMessage = 'Lỗi Google Sign-In: $code - $message';
+        }
+      } else if (e is ApiException) {
+        final statusCode = e.statusCode;
+        final body = e.body;
+        
+        if (kDebugMode) {
+          print('❌ API Exception status: $statusCode');
+          print('❌ API Exception body: $body');
+        }
+        
+        // Handle specific error codes
+        if (statusCode == 500) {
+          errorMessage = 'Lỗi máy chủ. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.';
+        } else if (statusCode == 400) {
+          errorMessage = body.isNotEmpty ? body : 'Thông tin đăng nhập không hợp lệ.';
+        } else if (statusCode == 401) {
+          errorMessage = 'Xác thực Google thất bại. Vui lòng thử lại.';
+        } else if (statusCode == 404) {
+          errorMessage = 'Không tìm thấy endpoint. Vui lòng kiểm tra kết nối.';
+        } else if (statusCode == 503) {
+          errorMessage = 'Dịch vụ tạm thời không khả dụng. Vui lòng thử lại sau.';
+        } else {
+          errorMessage = body.isNotEmpty ? body : 'Đã xảy ra lỗi không xác định.';
+        }
+      } else if (e.toString().contains('Failed to fetch') || 
+                 e.toString().contains('NetworkException') ||
+                 e.toString().contains('SocketException')) {
+        errorMessage = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối internet.';
       } else {
         errorMessage = e.toString();
+        // Truncate very long error messages
+        if (errorMessage.length > 200) {
+          errorMessage = '${errorMessage.substring(0, 200)}...';
+        }
       }
 
+      if (kDebugMode) {
+        print('📤 Returning error message: $errorMessage');
+      }
+      
       return GoogleSignInResult(
         success: false,
         message: errorMessage,

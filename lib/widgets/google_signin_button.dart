@@ -6,6 +6,7 @@ import '../services/google_auth_service.dart';
 import '../services/auth_service.dart';
 import '../services/api_client.dart';
 import '../theme/auth_theme.dart';
+import '../config/app_config.dart';
 
 class GoogleSignInButton extends StatefulWidget {
   const GoogleSignInButton({super.key});
@@ -15,8 +16,8 @@ class GoogleSignInButton extends StatefulWidget {
 }
 
 class _GoogleSignInButtonState extends State<GoogleSignInButton> {
-  static const String _googleWebClientId =
-      '1093884420538-ka17a3efctfkv117f1lqotu4uusgokn9.apps.googleusercontent.com';
+  // Use config from app_config.dart (matches React FE .env)
+  static const String _googleWebClientId = AppConfig.googleWebClientId;
 
   bool _isLoading = false;
 
@@ -70,8 +71,17 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
           // Parse role (ADMIN or STAFF)
           final roleStr = (me['role']?.toString() ?? 'CUSTOMER').toUpperCase();
           print('🔍 Google Login - Role from /me: $roleStr');
-          final isStaffOrAdmin = roleStr == 'STAFF' || roleStr == 'ADMIN';
-          print('🔍 Google Login - Is staff/admin: $isStaffOrAdmin');
+          
+          // Map roles correctly: ADMIN -> admin, STAFF -> staff
+          UserRole userRole;
+          if (roleStr == 'ADMIN') {
+            userRole = UserRole.admin;
+          } else if (roleStr == 'STAFF') {
+            userRole = UserRole.staff;
+          } else {
+            userRole = UserRole.customer;
+          }
+          print('🔍 Google Login - Mapped role: $userRole');
           
           // Parse points
           final pointsValue = me['sustainabilityPoints'] ?? me['points'] ?? 0;
@@ -87,7 +97,7 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
             name: me['fullName'] ?? '${me['firstName'] ?? result.firstName ?? ''} ${me['lastName'] ?? result.lastName ?? ''}'.trim(),
             email: me['email'] ?? result.email ?? '',
             phone: me['phone']?.toString(),
-            role: isStaffOrAdmin ? UserRole.staff : UserRole.customer,
+            role: userRole,
             points: points,
             staffId: me['staffId']?.toString(),
             storeName: me['storeName']?.toString(),
@@ -102,6 +112,10 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
 
           // Update auth service
           authService.updateUser(user);
+          
+          // Ensure auth state is updated and listeners are notified
+          // This will trigger the Consumer in main.dart to rebuild and show home page
+          authService.notifyListeners();
 
           // Show success message with points
           if (mounted) {
@@ -109,9 +123,17 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
               SnackBar(
                 content: Text('Đăng nhập thành công! Chào mừng ${user.name} - ${user.points} điểm'),
                 backgroundColor: AuthTheme.primary,
-                duration: const Duration(seconds: 3),
+                duration: const Duration(seconds: 2),
               ),
             );
+          }
+          
+          // Wait for state to propagate
+          if (mounted) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              // Navigation is handled by auth guard in main.dart
+              // No explicit navigation needed
+            });
           }
         } catch (meError) {
           print('❌ Error fetching /api/auth/me: $meError');
@@ -121,20 +143,38 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
             id: result.userId ?? '',
             name: '${result.firstName ?? ''} ${result.lastName ?? ''}'.trim(),
             email: result.email ?? '',
-            role: result.role?.toUpperCase() == 'ADMIN' || result.role?.toUpperCase() == 'STAFF'
-                ? UserRole.staff
-                : UserRole.customer,
+            role: () {
+              final roleStr = result.role?.toUpperCase() ?? 'CUSTOMER';
+              if (roleStr == 'ADMIN') {
+                return UserRole.admin;
+              } else if (roleStr == 'STAFF') {
+                return UserRole.staff;
+              } else {
+                return UserRole.customer;
+              }
+            }(),
             points: 0,
           );
           authService.updateUser(user);
+          
+          // Ensure auth state is updated
+          authService.notifyListeners();
           
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Đăng nhập thành công! ${user.name}'),
                 backgroundColor: AuthTheme.primary,
+                duration: const Duration(seconds: 2),
               ),
             );
+          }
+          
+          // Wait for state to propagate
+          if (mounted) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              // Navigation is handled by auth guard in main.dart
+            });
           }
         }
 
@@ -153,22 +193,89 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
       } else {
         // Show error message
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result.message),
-              backgroundColor: AuthTheme.destructive,
-            ),
-          );
+          if (kDebugMode) {
+            print('📱 Showing error message: ${result.message}');
+            print('📱 Contains DEVELOPER_ERROR: ${result.message.contains('DEVELOPER_ERROR')}');
+            print('📱 Contains SHA-1: ${result.message.contains('SHA-1 fingerprint')}');
+          }
+          
+          // Use AlertDialog for configuration errors (ApiException: 10)
+          if (result.message.contains('DEVELOPER_ERROR') || 
+              result.message.contains('SHA-1 fingerprint')) {
+            if (kDebugMode) {
+              print('📱 Showing AlertDialog for configuration error');
+            }
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Lỗi cấu hình Google Sign-In'),
+                content: SingleChildScrollView(
+                  child: Text(
+                    result.message,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Đã hiểu'),
+                  ),
+                ],
+              ),
+            );
+          } else {
+            // Use SnackBar for other errors
+            if (kDebugMode) {
+              print('📱 Showing SnackBar for error');
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(result.message),
+                backgroundColor: AuthTheme.destructive,
+                duration: const Duration(seconds: 5),
+              ),
+            );
+          }
         }
       }
     } catch (e) {
+      String errorMessage = 'Đăng nhập Google thất bại';
+      
+      // Handle PlatformException (Google Sign-In errors)
+      if (e.toString().contains('PlatformException')) {
+        if (e.toString().contains('sign_in_failed')) {
+          if (e.toString().contains('ApiException: 10')) {
+            errorMessage = 'Lỗi cấu hình Google Sign-In (DEVELOPER_ERROR).\n'
+                'Vui lòng thêm SHA-1 fingerprint vào Google Cloud Console:\n'
+                'SHA-1: 1A:3F:98:FB:F2:2B:3F:9F:77:ED:49:1E:AE:BD:69:C2:91:37:59:F8\n'
+                'Package: com.example.greenloop';
+          } else {
+            errorMessage = 'Đăng nhập Google thất bại. Vui lòng thử lại.';
+          }
+        } else {
+          errorMessage = 'Lỗi: ${e.toString()}';
+        }
+      } else {
+        errorMessage = 'Lỗi: ${e.toString()}';
+        // Truncate very long error messages
+        if (errorMessage.length > 200) {
+          errorMessage = '${errorMessage.substring(0, 200)}...';
+        }
+      }
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Lỗi: ${e.toString()}'),
+            content: Text(errorMessage),
             backgroundColor: AuthTheme.destructive,
+            duration: const Duration(seconds: 5),
           ),
         );
+      }
+      
+      if (kDebugMode) {
+        print('❌ Google Sign-In Error: $e');
+        print('❌ Error type: ${e.runtimeType}');
       }
     } finally {
       if (mounted) {

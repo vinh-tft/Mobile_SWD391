@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 class ApiClient {
   ApiClient({http.Client? httpClient, String? baseUrl, String? token})
       : _http = httpClient ?? http.Client(),
-        _baseUrl = _normalizeBaseUrl(baseUrl ?? 'http://localhost:8080'),
+        _baseUrl = _normalizeBaseUrl(baseUrl ?? 'http://localhost:8082'),
         _token = token;
 
   final http.Client _http;
@@ -19,7 +21,27 @@ class ApiClient {
   Uri _uri(String path, [Map<String, dynamic>? query]) {
     final root = _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
     final p = path.startsWith('/') ? path : '/$path';
-    return Uri.parse('$root$p').replace(queryParameters: query);
+    
+    if (query == null || query.isEmpty) {
+      return Uri.parse('$root$p');
+    }
+    
+    // Build query string manually to handle arrays properly
+    // Try multiple formats: statuses[]=value1&statuses[]=value2 or statuses=value1&statuses=value2
+    final queryParts = <String>[];
+    query.forEach((key, value) {
+      if (value is List) {
+        // For arrays, try format: statuses=value1&statuses=value2 (like axios)
+        for (var item in value) {
+          queryParts.add('${Uri.encodeComponent(key)}=${Uri.encodeComponent(item.toString())}');
+        }
+      } else if (value != null) {
+        queryParts.add('${Uri.encodeComponent(key)}=${Uri.encodeComponent(value.toString())}');
+      }
+    });
+    
+    final queryString = queryParts.isNotEmpty ? '?${queryParts.join('&')}' : '';
+    return Uri.parse('$root$p$queryString');
   }
 
   static String _normalizeBaseUrl(String url) {
@@ -46,9 +68,22 @@ class ApiClient {
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query, Duration? timeout}) async {
     try {
+      final uri = _uri(path, query);
+      print('🌐 GET Request');
+      print('📍 URL: $uri');
+      print('🏠 Base URL: $_baseUrl');
+      print('📝 Path: $path');
+      if (query != null && query.isNotEmpty) {
+        print('🔍 Query params: $query');
+      }
+      
       final res = await _http
-          .get(_uri(path, query), headers: _headers())
+          .get(uri, headers: _headers())
           .timeout(timeout ?? _timeout);
+      
+      print('📦 Response status: ${res.statusCode}');
+      print('📦 Response body length: ${res.body.length}');
+      
       return _handleResponse(res);
     } on TimeoutException catch (_) {
       throw ApiException(408, 'Yêu cầu quá thời gian. Vui lòng thử lại.');
@@ -116,6 +151,78 @@ class ApiClient {
           )
           .timeout(timeout ?? _timeout);
       return _handleResponse(res);
+    } on TimeoutException catch (_) {
+      throw ApiException(408, 'Yêu cầu quá thời gian. Vui lòng thử lại.');
+    }
+  }
+
+  // Upload multiple files using multipart/form-data
+  Future<dynamic> postMultipart(
+    String path, {
+    required List<File> files,
+    String fileFieldName = 'files',
+    Map<String, dynamic>? query,
+    Duration? timeout,
+  }) async {
+    try {
+      final uri = _uri(path, query);
+      print('🌐 POST Multipart Request');
+      print('📍 URL: $uri');
+      print('📁 Files: ${files.length}');
+      
+      final request = http.MultipartRequest('POST', uri);
+      
+      // Add authorization header
+      if (_token != null && _token!.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $_token';
+      }
+      
+      // Add files
+      for (var file in files) {
+        if (await file.exists()) {
+          final fileStream = http.ByteStream(Stream.castFrom(file.openRead()));
+          final fileLength = await file.length();
+          final fileName = file.path.split('/').last;
+          
+          // Detect content type from file extension
+          MediaType contentType;
+          final extension = fileName.split('.').last.toLowerCase();
+          switch (extension) {
+            case 'jpg':
+            case 'jpeg':
+              contentType = MediaType('image', 'jpeg');
+              break;
+            case 'png':
+              contentType = MediaType('image', 'png');
+              break;
+            case 'gif':
+              contentType = MediaType('image', 'gif');
+              break;
+            case 'webp':
+              contentType = MediaType('image', 'webp');
+              break;
+            default:
+              contentType = MediaType('image', 'jpeg'); // Default
+          }
+          
+          final multipartFile = http.MultipartFile(
+            fileFieldName,
+            fileStream,
+            fileLength,
+            filename: fileName,
+            contentType: contentType,
+          );
+          request.files.add(multipartFile);
+        }
+      }
+      
+      final streamedResponse = await _http.send(request).timeout(timeout ?? Duration(seconds: 120));
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      print('📦 Response status: ${response.statusCode}');
+      print('📦 Response body length: ${response.body.length}');
+      
+      return _handleResponse(response);
     } on TimeoutException catch (_) {
       throw ApiException(408, 'Yêu cầu quá thời gian. Vui lòng thử lại.');
     }

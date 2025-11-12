@@ -191,7 +191,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Đã cập nhật: ${authService.currentUser?.points ?? 0} điểm'),
+                            content: Text('Updated: ${authService.currentUser?.points ?? 0} points'),
                             behavior: SnackBarBehavior.floating,
                             backgroundColor: AppColors.primary,
                             duration: const Duration(seconds: 2),
@@ -199,7 +199,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         );
                       }
                     },
-                    tooltip: 'Làm mới điểm',
+                    tooltip: 'Refresh Points',
                   );
                 },
               ),
@@ -235,7 +235,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       child: Column(
         children: [
           Text(
-            authService.isStaff ? 'Quản lý cửa hàng' : 'Thời trang xanh',
+            authService.isStaff ? 'Store Management' : 'Sustainable Fashion',
             style: const TextStyle(
               fontSize: 30,
               fontWeight: FontWeight.bold,
@@ -248,8 +248,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           const SizedBox(height: 12),
           Text(
             authService.isStaff 
-                ? 'Nạp điểm cho khách hàng và quản lý kho hàng hiệu quả'
-                : 'Mua sắm thông minh, bảo vệ môi trường',
+                ? 'Recharge points for customers and manage inventory efficiently'
+                : 'Shop smart, protect the environment',
             style: TextStyle(
               fontSize: 16,
               color: Colors.white.withOpacity(0.95),
@@ -262,7 +262,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             children: [
               Expanded(
                 child: _buildHeroButton(
-                  authService.isStaff ? 'Nạp điểm' : 'Nạp điểm', 
+                  authService.isStaff ? 'Recharge Points' : 'Recharge Points', 
                   Icons.account_balance_wallet_rounded,
                   true, 
                   () {
@@ -287,7 +287,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildHeroButton(
-                  authService.isStaff ? 'Kho hàng' : 'Mua sắm', 
+                  authService.isStaff ? 'Inventory' : 'Shop', 
                   authService.isStaff ? Icons.inventory_2_rounded : Icons.shopping_bag_rounded,
                   false, 
                   () {
@@ -352,11 +352,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          Expanded(child: _buildStatCard('10K+', 'Sản phẩm', Icons.checkroom_rounded, AppColors.primary)),
+          Expanded(child: _buildStatCard('10K+', 'Products', Icons.checkroom_rounded, AppColors.primary)),
           const SizedBox(width: 12),
-          Expanded(child: _buildStatCard('5K+', 'Người dùng', Icons.people_rounded, AppColors.info)),
+          Expanded(child: _buildStatCard('5K+', 'Users', Icons.people_rounded, AppColors.info)),
           const SizedBox(width: 12),
-          Expanded(child: _buildStatCard('2K+', 'Tấn CO₂', Icons.eco_rounded, AppColors.success)),
+          Expanded(child: _buildStatCard('2K+', 'Tons CO₂', Icons.eco_rounded, AppColors.success)),
         ],
       ),
     );
@@ -428,7 +428,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
             child: Text(
-              'Cách thức hoạt động',
+              'How It Works',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -439,22 +439,22 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 20),
           _buildFeatureCard(
-            'Nạp điểm', 
-            'Nạp điểm vào tài khoản của bạn', 
+            'Recharge Points', 
+            'Add points to your account', 
             Icons.account_balance_wallet_rounded,
             AppColors.primary,
           ),
           const SizedBox(height: 12),
           _buildFeatureCard(
-            'Mua sắm', 
-            'Dùng điểm mua quần áo thời trang', 
+            'Shop', 
+            'Use points to buy fashion items', 
             Icons.shopping_bag_rounded,
             AppColors.info,
           ),
           const SizedBox(height: 12),
           _buildFeatureCard(
-            'Đổi quần áo', 
-            'Đem quần áo cũ đến cửa hàng đổi điểm', 
+            'Exchange Clothes', 
+            'Bring old clothes to the store to exchange for points', 
             Icons.autorenew_rounded,
             AppColors.success,
           ),
@@ -542,7 +542,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
             child: Text(
-              'Chức năng chính',
+              'Main Features',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -577,7 +577,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildQuickActionCard(
-                  'Kho hàng',
+                  'Inventory',
                   Icons.inventory_2_rounded,
                   AppColors.info,
                   () {
@@ -591,7 +591,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildQuickActionCard(
-                  'Giao dịch',
+                  'Transactions',
                   Icons.receipt_long_rounded,
                   const Color(0xFF8B5CF6),
                   () {
@@ -623,7 +623,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildQuickActionCard(
-                  'Mua sắm',
+                  'Shop',
                   Icons.shopping_bag_rounded,
                   AppColors.info,
                   () {
@@ -637,7 +637,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildQuickActionCard(
-                  'Đổi đồ',
+                  'Exchange',
                   Icons.autorenew_rounded,
                   AppColors.success,
                   () {
@@ -718,7 +718,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           borderRadius: BorderRadius.circular(20),
         ),
         title: Text(
-          'Đổi quần áo lấy điểm',
+          'Exchange Clothes for Points',
           style: TextStyle(
             color: AppColors.foreground,
             fontWeight: FontWeight.bold,
@@ -741,7 +741,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 20),
             Text(
-              'Đem quần áo cũ đến cửa hàng để đổi lấy điểm',
+              'Bring old clothes to the store to exchange for points',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.foreground,
@@ -783,7 +783,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
-              'Đóng',
+              'Close',
               style: TextStyle(color: AppColors.mutedForeground),
             ),
           ),
@@ -792,7 +792,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: const Text('Đã ghi nhận! Hãy đến cửa hàng để đổi quần áo'),
+                  content: const Text('Recorded! Please visit the store to exchange clothes'),
                   backgroundColor: AppColors.primary,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
@@ -808,7 +808,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text('Xác nhận'),
+            child: const Text('Confirm'),
           ),
         ],
       ),
