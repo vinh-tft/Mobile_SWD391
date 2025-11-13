@@ -115,6 +115,7 @@ class PointsService {
     required String userId,
     required int pointsAmount,
     required String description,
+    String? returnUrl,
   }) async {
     try {
       final body = {
@@ -122,6 +123,9 @@ class PointsService {
         'pointsAmount': pointsAmount,
         'description': description,
       };
+      if (returnUrl != null && returnUrl.isNotEmpty) {
+        body['returnUrl'] = returnUrl;
+      }
       
       final response = await _api.post('/api/payment/momo/buy-points', body: body);
       
@@ -134,6 +138,36 @@ class PointsService {
     } catch (e) {
       print('❌ Error buying points with MoMo: $e');
       return null;
+    }
+  }
+
+  Future<bool> completeMomoPayment({
+    required String orderId,
+    required String requestId,
+    required String resultCode,
+    String? message,
+  }) async {
+    try {
+      final body = {
+        'orderId': orderId,
+        'requestId': requestId,
+        'resultCode': resultCode,
+        if (message != null) 'message': message,
+      };
+
+      final response = await _api.post('/api/payment/momo/redirect', body: body);
+
+      if (response is Map) {
+        final isSuccess = response['success'] == true;
+        if (isSuccess && _auth != null) {
+          await _auth!.refreshPoints();
+        }
+        return isSuccess;
+      }
+      return false;
+    } catch (e) {
+      print('❌ Error completing MoMo payment: $e');
+      return false;
     }
   }
 

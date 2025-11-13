@@ -22,6 +22,7 @@ import 'services/google_auth_service.dart';
 import 'services/cart_service.dart';
 import 'services/chat_service.dart';
 import 'services/donations_service.dart';
+import 'services/post_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_colors.dart';
 import 'widgets/animated_bottom_nav.dart';
@@ -76,6 +77,12 @@ void main() {
             final api = useFakeData ? FakeApiClient() : context.read<ApiClient>();
             return ItemsService(api);
           },
+        ),
+        ChangeNotifierProvider<PostService>(
+          create: (context) => PostService(
+            context.read<ApiClient>(),
+            context.read<AuthService>(),
+          ),
         ),
         ChangeNotifierProvider<CategoriesService>(
           create: (context) {

@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uni_links/uni_links.dart';
+import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../services/points_service.dart';
 
@@ -16,6 +19,11 @@ class _RechargePageState extends State<RechargePage> {
   final TextEditingController _amountController = TextEditingController();
   int? _selectedPackage;
   bool _isLoading = false;
+  bool _handlingDeepLink = false;
+  StreamSubscription<Uri?>? _linkSubscription;
+  String? _pendingOrderId;
+  String? _pendingRequestId;
+  final Set<String> _handledOrderIds = {};
 
   final List<Map<String, dynamic>> _pointPackages = [
     { 'points': 10000, 'price': 10000, 'popular': false, 'label': '10K' },
@@ -27,9 +35,18 @@ class _RechargePageState extends State<RechargePage> {
   static const int PRICE_PER_POINT = 1; // 1 VND per point
   static const int MIN_POINTS = 10000;    // Minimum 10,000 points
   static const int MAX_POINTS = 10000000; // Maximum 10,000,000 points
+  static const String _momoReturnUrl = 'greenloop://payments/momo-result';
+
+  @override
+  void initState() {
+    super.initState();
+    _listenForDeepLinks();
+    _handleInitialUri();
+  }
 
   @override
   void dispose() {
+    _linkSubscription?.cancel();
     _amountController.dispose();
     super.dispose();
   }
@@ -476,6 +493,7 @@ class _RechargePageState extends State<RechargePage> {
   }
 
   Future<void> _handleRecharge() async {
+    if (_isLoading) return;
     final points = _getSelectedPoints();
     
     if (points < MIN_POINTS) {
@@ -523,6 +541,7 @@ class _RechargePageState extends State<RechargePage> {
         userId: userId,
         pointsAmount: points,
         description: 'Buy $points points',
+        returnUrl: _momoReturnUrl,
       );
 
       setState(() => _isLoading = false);
@@ -541,6 +560,8 @@ class _RechargePageState extends State<RechargePage> {
       final payUrl = paymentResponse['payUrl'] as String?;
       final paymentId = paymentResponse['paymentId'] as String?;
       final errorMessage = paymentResponse['errorMessage'] as String?;
+      final requestId = paymentResponse['requestId']?.toString();
+      final orderId = paymentResponse['orderId']?.toString();
 
       if (!success || payUrl == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -557,13 +578,30 @@ class _RechargePageState extends State<RechargePage> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('lastPaymentId', paymentId);
       }
+      if (orderId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('pendingMomoOrderId', orderId);
+      }
+      if (requestId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('pendingMomoRequestId', requestId);
+      }
+
+      _pendingOrderId = orderId;
+      _pendingRequestId = requestId;
 
       // Open MoMo payment URL
       final uri = Uri.parse(payUrl);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
-        // Close the page after launching payment
-        Navigator.pop(context);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Complete the payment in MoMo, then return to the app.'),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -580,6 +618,121 @@ class _RechargePageState extends State<RechargePage> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  void _listenForDeepLinks() {
+    // Handle stream updates while the page is alive
+    _linkSubscription = uriLinkStream.listen(
+      (uri) {
+        if (uri != null) {
+          _handleIncomingUri(uri);
+        }
+      },
+      onError: (Object err) {
+        debugPrint('❌ Error processing incoming link: $err');
+      },
+    );
+  }
+
+  Future<void> _handleInitialUri() async {
+    try {
+      final uri = await getInitialUri();
+      if (uri != null) {
+        await _handleIncomingUri(uri);
+      }
+    } on PlatformException catch (e) {
+      debugPrint('❌ Failed to get initial URI: $e');
+    } on FormatException catch (e) {
+      debugPrint('❌ Malformed initial URI: $e');
+    }
+  }
+
+  Future<void> _handleIncomingUri(Uri uri) async {
+    if (uri.scheme != 'greenloop') return;
+    if (uri.host != 'payments') return;
+    if (uri.pathSegments.isEmpty || uri.pathSegments.first != 'momo-result') return;
+
+    final orderId = uri.queryParameters['orderId'] ?? uri.queryParameters['orderid'];
+    if (orderId != null && _handledOrderIds.contains(orderId)) {
+      return;
+    }
+
+    final requestId = uri.queryParameters['requestId'] ?? uri.queryParameters['requestid'] ?? _pendingRequestId;
+    final resultCode = uri.queryParameters['resultCode'] ?? uri.queryParameters['resultcode'];
+    final message = uri.queryParameters['message'];
+
+    if (orderId == null || resultCode == null || requestId == null) {
+      debugPrint('⚠️ Missing required MoMo callback params: orderId=$orderId, requestId=$requestId, resultCode=$resultCode');
+      return;
+    }
+
+    _handledOrderIds.add(orderId);
+    await _completePayment(orderId: orderId, requestId: requestId, resultCode: resultCode, message: message);
+  }
+
+  Future<void> _completePayment({
+    required String orderId,
+    required String requestId,
+    required String resultCode,
+    String? message,
+  }) async {
+    if (!mounted || _handlingDeepLink) return;
+    _handlingDeepLink = true;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    final pointsService = context.read<PointsService>();
+    final authService = context.read<AuthService>();
+
+    try {
+      final success = await pointsService.completeMomoPayment(
+        orderId: orderId,
+        requestId: requestId,
+        resultCode: resultCode,
+        message: message,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('lastPaymentId');
+      await prefs.remove('pendingMomoOrderId');
+      await prefs.remove('pendingMomoRequestId');
+
+      if (success && mounted) {
+        await authService.refreshPoints();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Payment completed successfully. Points have been updated.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context, true);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message ?? 'Unable to validate payment. Please check your history.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error completing payment: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      _handlingDeepLink = false;
     }
   }
 

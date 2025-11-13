@@ -135,6 +135,13 @@ class ApiConfig {
       'googleLogin': '/api/auth/google/login',
       'googleCompleteProfile': '/api/auth/google/complete-profile',
     },
+    // Posts & social feed
+    'posts': {
+      'base': '/api/posts',
+      'feed': '/api/posts/feed',
+      'followingFeed': '/api/posts/feed/following',
+      'communityFeed': '/api/posts/feed/community',
+    },
     // Health Check
     'health': '/actuator/health',
   };
@@ -145,6 +152,12 @@ class ApiConfig {
    */
   static String pointsAvailable(String userId) => '/api/points/$userId/available';
   static String pointsHistory(String userId) => '/api/points/$userId/history';
+
+  static String postsForUser(String userId) => '/api/posts/users/$userId';
+  static String postDetail(String postId) => '/api/posts/$postId';
+  static String likePost(String postId) => '/api/posts/$postId/like';
+  static String restorePost(String postId) => '/api/posts/$postId/restore';
+  static String commentsForPost(String postId) => '/api/posts/$postId/comments';
 }
 
 /**

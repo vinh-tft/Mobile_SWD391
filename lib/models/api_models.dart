@@ -198,6 +198,304 @@ class BrandCreateRequest {
   }
 }
 
+// Post & Comment Models
+class PostResponse {
+  final String postId;
+  final String? authorId;
+  final String? authorUsername;
+  final String? authorDisplayName;
+  final String? authorAvatarUrl;
+  final String? content;
+  final List<String> images;
+  final List<String> videos;
+  final List<String> hashtags;
+  final String postType;
+  final String visibility;
+  final bool featured;
+  final bool hidden;
+  final int likesCount;
+  final int commentsCount;
+  final int sharesCount;
+  final int viewsCount;
+  final bool likedByViewer;
+  final String? itemId;
+  final String? itemName;
+  final String createdAt;
+  final String updatedAt;
+
+  PostResponse({
+    required this.postId,
+    this.authorId,
+    this.authorUsername,
+    this.authorDisplayName,
+    this.authorAvatarUrl,
+    this.content,
+    this.images = const [],
+    this.videos = const [],
+    this.hashtags = const [],
+    this.postType = 'GENERAL',
+    this.visibility = 'PUBLIC',
+    this.featured = false,
+    this.hidden = false,
+    this.likesCount = 0,
+    this.commentsCount = 0,
+    this.sharesCount = 0,
+    this.viewsCount = 0,
+    this.likedByViewer = false,
+    this.itemId,
+    this.itemName,
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  factory PostResponse.fromJson(Map<String, dynamic> json) {
+    final imagesRaw = json['images'];
+    final videosRaw = json['videos'];
+    final hashtagsRaw = json['hashtags'];
+
+    bool parseBool(dynamic value, {bool defaultValue = false}) {
+      if (value is bool) return value;
+      if (value is String) {
+        return value.toLowerCase() == 'true';
+      }
+      if (value is num) {
+        return value != 0;
+      }
+      return defaultValue;
+    }
+
+    int parseInt(dynamic value) {
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    return PostResponse(
+      postId: (json['postId'] ?? '').toString(),
+      authorId: json['authorId']?.toString(),
+      authorUsername: json['authorUsername']?.toString(),
+      authorDisplayName: json['authorDisplayName']?.toString(),
+      authorAvatarUrl: json['authorAvatarUrl']?.toString(),
+      content: json['content']?.toString(),
+      images: imagesRaw is List
+          ? imagesRaw.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList()
+          : const <String>[],
+      videos: videosRaw is List
+          ? videosRaw.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList()
+          : const <String>[],
+      hashtags: hashtagsRaw is List
+          ? hashtagsRaw.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList()
+          : const <String>[],
+      postType: json['postType']?.toString() ?? 'GENERAL',
+      visibility: json['visibility']?.toString() ?? 'PUBLIC',
+      featured: parseBool(json['featured'] ?? json['isFeatured']),
+      hidden: parseBool(json['hidden'] ?? json['isHidden']),
+      likesCount: parseInt(json['likesCount']),
+      commentsCount: parseInt(json['commentsCount']),
+      sharesCount: parseInt(json['sharesCount']),
+      viewsCount: parseInt(json['viewsCount']),
+      likedByViewer: parseBool(json['likedByViewer']),
+      itemId: json['itemId']?.toString(),
+      itemName: json['itemName']?.toString(),
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
+    );
+  }
+
+  PostResponse copyWith({
+    String? postId,
+    String? authorId,
+    String? authorUsername,
+    String? authorDisplayName,
+    String? authorAvatarUrl,
+    String? content,
+    List<String>? images,
+    List<String>? videos,
+    List<String>? hashtags,
+    String? postType,
+    String? visibility,
+    bool? featured,
+    bool? hidden,
+    int? likesCount,
+    int? commentsCount,
+    int? sharesCount,
+    int? viewsCount,
+    bool? likedByViewer,
+    String? itemId,
+    String? itemName,
+    String? createdAt,
+    String? updatedAt,
+  }) {
+    return PostResponse(
+      postId: postId ?? this.postId,
+      authorId: authorId ?? this.authorId,
+      authorUsername: authorUsername ?? this.authorUsername,
+      authorDisplayName: authorDisplayName ?? this.authorDisplayName,
+      authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
+      content: content ?? this.content,
+      images: images ?? this.images,
+      videos: videos ?? this.videos,
+      hashtags: hashtags ?? this.hashtags,
+      postType: postType ?? this.postType,
+      visibility: visibility ?? this.visibility,
+      featured: featured ?? this.featured,
+      hidden: hidden ?? this.hidden,
+      likesCount: likesCount ?? this.likesCount,
+      commentsCount: commentsCount ?? this.commentsCount,
+      sharesCount: sharesCount ?? this.sharesCount,
+      viewsCount: viewsCount ?? this.viewsCount,
+      likedByViewer: likedByViewer ?? this.likedByViewer,
+      itemId: itemId ?? this.itemId,
+      itemName: itemName ?? this.itemName,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}
+
+class PostCreateRequest {
+  final String? content;
+  final List<String> images;
+  final List<String> hashtags;
+  final String? itemId;
+  final String postType;
+  final String visibility;
+  final bool featured;
+
+  PostCreateRequest({
+    this.content,
+    this.images = const [],
+    this.hashtags = const [],
+    this.itemId,
+    this.postType = 'GENERAL',
+    this.visibility = 'PUBLIC',
+    this.featured = false,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (content != null && content!.isNotEmpty) 'content': content,
+      'images': images,
+      'hashtags': hashtags,
+      if (itemId != null && itemId!.isNotEmpty) 'itemId': itemId,
+      'postType': postType,
+      'visibility': visibility,
+      'featured': featured,
+    };
+  }
+}
+
+class PostUpdateRequest {
+  final String? content;
+  final List<String>? images;
+  final List<String>? hashtags;
+  final String? itemId;
+  final String? postType;
+  final String? visibility;
+  final bool? featured;
+  final bool? hidden;
+
+  PostUpdateRequest({
+    this.content,
+    this.images,
+    this.hashtags,
+    this.itemId,
+    this.postType,
+    this.visibility,
+    this.featured,
+    this.hidden,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (content != null) 'content': content,
+      if (images != null) 'images': images,
+      if (hashtags != null) 'hashtags': hashtags,
+      if (itemId != null) 'itemId': itemId,
+      if (postType != null) 'postType': postType,
+      if (visibility != null) 'visibility': visibility,
+      if (featured != null) 'featured': featured,
+      if (hidden != null) 'hidden': hidden,
+    };
+  }
+}
+
+class CommentResponse {
+  final int commentId;
+  final String postId;
+  final String? authorId;
+  final String? authorUsername;
+  final String? authorDisplayName;
+  final String? authorAvatarUrl;
+  final String content;
+  final bool edited;
+  final String createdAt;
+  final String updatedAt;
+
+  CommentResponse({
+    required this.commentId,
+    required this.postId,
+    this.authorId,
+    this.authorUsername,
+    this.authorDisplayName,
+    this.authorAvatarUrl,
+    required this.content,
+    this.edited = false,
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  factory CommentResponse.fromJson(Map<String, dynamic> json) {
+    int parseId(dynamic value) {
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    bool parseBool(dynamic value) {
+      if (value is bool) return value;
+      if (value is String) return value.toLowerCase() == 'true';
+      if (value is num) return value != 0;
+      return false;
+    }
+
+    return CommentResponse(
+      commentId: parseId(json['commentId']),
+      postId: json['postId']?.toString() ?? '',
+      authorId: json['authorId']?.toString(),
+      authorUsername: json['authorUsername']?.toString(),
+      authorDisplayName: json['authorDisplayName']?.toString(),
+      authorAvatarUrl: json['authorAvatarUrl']?.toString(),
+      content: json['content']?.toString() ?? '',
+      edited: parseBool(json['edited'] ?? json['isEdited']),
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
+    );
+  }
+}
+
+class CommentCreateRequest {
+  final String content;
+
+  CommentCreateRequest({required this.content});
+
+  Map<String, dynamic> toJson() => {
+        'content': content,
+      };
+}
+
+class CommentUpdateRequest {
+  final String content;
+
+  CommentUpdateRequest({required this.content});
+
+  Map<String, dynamic> toJson() => {
+        'content': content,
+      };
+}
+
 // Item Models
 enum ItemStatus {
   DRAFT,
