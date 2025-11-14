@@ -83,3 +83,9 @@
 
 # Keep synthetic methods
 -keepattributes SyntheticAccessor
+
+# Google Play Core library - ignore missing classes (not used in this app)
+-dontwarn com.google.android.play.core.splitcompat.**
+-dontwarn com.google.android.play.core.splitinstall.**
+-dontwarn com.google.android.play.core.tasks.**
+-keep class com.google.android.play.core.** { *; }
