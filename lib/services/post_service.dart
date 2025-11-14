@@ -97,7 +97,7 @@ class PostService extends ChangeNotifier {
       notifyListeners();
       return updated;
     } on ApiException catch (e) {
-      _error = e.message;
+      _error = e.body;
       notifyListeners();
       rethrow;
     } catch (e) {
@@ -120,7 +120,7 @@ class PostService extends ChangeNotifier {
       notifyListeners();
       return post;
     } on ApiException catch (e) {
-      _error = e.message;
+      _error = e.body;
       notifyListeners();
       rethrow;
     } catch (e) {
@@ -152,7 +152,7 @@ class PostService extends ChangeNotifier {
       notifyListeners();
       return updated;
     } on ApiException catch (e) {
-      _error = e.message;
+      _error = e.body;
       notifyListeners();
       rethrow;
     } catch (e) {
@@ -176,7 +176,7 @@ class PostService extends ChangeNotifier {
       _posts.removeWhere((p) => p.postId == postId);
       notifyListeners();
     } on ApiException catch (e) {
-      _error = e.message;
+      _error = e.body;
       notifyListeners();
       rethrow;
     } catch (e) {
@@ -206,7 +206,7 @@ class PostService extends ChangeNotifier {
       }
       notifyListeners();
     } on ApiException catch (e) {
-      _error = e.message;
+      _error = e.body;
       notifyListeners();
       rethrow;
     } catch (e) {
@@ -228,7 +228,7 @@ class PostService extends ChangeNotifier {
       final pageResponse = _parseCommentPage(response);
       return pageResponse.content;
     } on ApiException catch (e) {
-      throw Exception(e.message);
+      throw Exception(e.body);
     }
   }
 
@@ -248,7 +248,7 @@ class PostService extends ChangeNotifier {
       _updatePostCounters(postId, commentsDelta: 1);
       return comment;
     } on ApiException catch (e) {
-      throw Exception(e.message);
+      throw Exception(e.body);
     }
   }
 
@@ -266,7 +266,7 @@ class PostService extends ChangeNotifier {
       );
       return _parseComment(response);
     } on ApiException catch (e) {
-      throw Exception(e.message);
+      throw Exception(e.body);
     }
   }
 
@@ -283,7 +283,7 @@ class PostService extends ChangeNotifier {
       );
       _updatePostCounters(postId, commentsDelta: -1);
     } on ApiException catch (e) {
-      throw Exception(e.message);
+      throw Exception(e.body);
     }
   }
 
@@ -389,7 +389,7 @@ class PostService extends ChangeNotifier {
       _hasMore = !pageResponse.last;
       _page = pageResponse.number + 1;
     } on ApiException catch (e) {
-      _error = e.message;
+      _error = e.body;
     } catch (e) {
       _error = e.toString();
     } finally {

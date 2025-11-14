@@ -50,13 +50,13 @@ class _PaymentResultPageState extends State<PaymentResultPage> {
                   decoration: BoxDecoration(
                     color: widget.success
                         ? AppColors.success.withOpacity(0.1)
-                        : AppColors.error.withOpacity(0.1),
+                        : AppColors.destructive.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     widget.success ? Icons.check_circle : Icons.error,
                     size: 60,
-                    color: widget.success ? AppColors.success : AppColors.error,
+                    color: widget.success ? AppColors.success : AppColors.destructive,
                   ),
                 ),
 
@@ -68,7 +68,7 @@ class _PaymentResultPageState extends State<PaymentResultPage> {
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: widget.success ? AppColors.success : AppColors.error,
+                    color: widget.success ? AppColors.success : AppColors.destructive,
                   ),
                 ),
 

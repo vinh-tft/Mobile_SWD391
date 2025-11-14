@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uni_links/uni_links.dart';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../services/points_service.dart';
@@ -24,6 +24,7 @@ class _RechargePageState extends State<RechargePage> {
   String? _pendingOrderId;
   String? _pendingRequestId;
   final Set<String> _handledOrderIds = {};
+  late AppLinks _appLinks;
 
   final List<Map<String, dynamic>> _pointPackages = [
     { 'points': 10000, 'price': 10000, 'popular': false, 'label': '10K' },
@@ -40,6 +41,7 @@ class _RechargePageState extends State<RechargePage> {
   @override
   void initState() {
     super.initState();
+    _appLinks = AppLinks();
     _listenForDeepLinks();
     _handleInitialUri();
   }
@@ -623,7 +625,7 @@ class _RechargePageState extends State<RechargePage> {
 
   void _listenForDeepLinks() {
     // Handle stream updates while the page is alive
-    _linkSubscription = uriLinkStream.listen(
+    _linkSubscription = _appLinks.uriLinkStream.listen(
       (uri) {
         if (uri != null) {
           _handleIncomingUri(uri);
@@ -637,7 +639,7 @@ class _RechargePageState extends State<RechargePage> {
 
   Future<void> _handleInitialUri() async {
     try {
-      final uri = await getInitialUri();
+      final uri = await _appLinks.getInitialLink();
       if (uri != null) {
         await _handleIncomingUri(uri);
       }
